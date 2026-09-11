@@ -34,10 +34,19 @@ class ImageModelRoutingTests(unittest.TestCase):
         self.assertEqual(codex_tool_model("codex-gpt-image-2.5"), "gpt-image-2.5-flare")
 
     def test_unknown_models_do_not_silently_fall_back(self):
-        for model in ("gpt-image-2.5", "gpt-image-3.0", "plus-gpt-image-2", "gpt-image-2-5"):
+        for model in ("plus-gpt-image-2.5", "gpt-image-3.0", "plus-gpt-image-2", "gpt-image-2-5"):
             self.assertFalse(is_supported_image_model(model))
             with self.assertRaises(ImageModelParameterError):
                 codex_tool_model(model)
+
+    def test_bare_25_is_a_web_alias_not_a_codex_variant(self):
+        self.assertEqual(split_image_model(" GPT-IMAGE-2.5 "), (None, "gpt-image-2.5"))
+        self.assertTrue(is_supported_image_model("gpt-image-2.5"))
+        self.assertFalse(is_codex_image_model("gpt-image-2.5"))
+        self.assertFalse(is_gpt_image_25_model("gpt-image-2.5"))
+        self.assertNotIn("max", image_model_qualities("gpt-image-2.5"))
+        with self.assertRaises(ImageModelParameterError):
+            codex_tool_model("gpt-image-2.5")
 
     def test_only_25_exposes_extra_quality_levels(self):
         self.assertIn("xhigh", image_model_qualities("gpt-image-2.5-flare"))

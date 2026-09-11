@@ -7,7 +7,9 @@ import re
 
 IMAGE_MODEL_PLAN_TYPES = ("plus", "team", "pro")
 CODEX_IMAGE_MODEL = "codex-gpt-image-2"
-WEB_IMAGE_MODELS = frozenset({"gpt-image-2"})
+# 这是本项目的 Web 兼容入口，不是已验证的官方图片引擎标识。
+WEB_AUTO_IMAGE_MODEL = "gpt-image-2.5"
+WEB_IMAGE_MODELS = frozenset({"gpt-image-2", WEB_AUTO_IMAGE_MODEL})
 GPT_IMAGE_25_MODELS = frozenset({
     "gpt-image-2.5-flare",
     "gpt-image-2.5-sunburst",
@@ -59,6 +61,11 @@ def is_supported_image_model(model: object) -> bool:
 
 def is_codex_image_model(model: object) -> bool:
     return split_image_model(model)[1] in CODEX_IMAGE_MODELS
+
+
+def is_web_auto_image_model(model: object) -> bool:
+    """识别显式的 Web 自动入口，不把它视为已确认的 2.5 引擎。"""
+    return split_image_model(model)[1] == WEB_AUTO_IMAGE_MODEL
 
 
 def codex_tool_model(model: object) -> str:

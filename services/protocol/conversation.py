@@ -25,7 +25,9 @@ from utils.helper import (
     is_supported_image_model,
     split_image_model,
 )
-from utils.image_models import ImageModelParameterError, is_gpt_image_25_model, validate_image_options
+from utils.image_models import (
+    ImageModelParameterError, is_gpt_image_25_model, is_web_auto_image_model, validate_image_options,
+)
 from utils.image_tokens import count_image_content_tokens, sum_token_usages
 from utils.log import logger
 
@@ -348,6 +350,14 @@ class ImageOutput:
     conversation_id: str = ""
     usage: dict[str, Any] | None = None
     usage_source: str = ""
+
+    def __post_init__(self) -> None:
+        # 新 Web 入口的实际图片引擎不透明，流式和汇总结果都不能伪装成已知用量。
+        if (
+            self.kind == "result" and is_web_auto_image_model(self.model)
+            and self.usage is None and not self.usage_source
+        ):
+            self.usage_source = "unavailable"
 
     def to_chunk(self) -> dict[str, Any]:
         chunk: dict[str, Any] = {
@@ -1353,9 +1363,12 @@ def _generate_single_image(
                 request.progress_callback("getting_account")
             plan_type, _ = split_image_model(request.model)
             codex_model = is_codex_image_model(request.model)
+            source_type = "codex" if codex_model else None
+            if is_web_auto_image_model(request.model):
+                source_type = "web"
             token = account_service.get_available_access_token(
                 plan_type=plan_type,
-                source_type="codex" if codex_model else None,
+                source_type=source_type,
                 plan_types=("plus", "team", "pro") if codex_model and not plan_type else None,
             )
         except RuntimeError as exc:

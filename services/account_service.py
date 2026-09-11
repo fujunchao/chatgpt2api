@@ -150,7 +150,12 @@ class AccountService:
     def _account_matches_source_type(cls, account: dict, source_type: str | None = None) -> bool:
         if not source_type:
             return True
-        return cls._normalize_source_type(account.get("source_type")) == cls._normalize_source_type(source_type)
+        actual = cls._normalize_source_type(account.get("source_type"))
+        expected = cls._normalize_source_type(source_type)
+        if expected == "web":
+            # 密码登录仍使用 Web 通道；保留存储来源值，不将 Codex 令牌混入。
+            return actual in {"web", "password"}
+        return actual == expected
 
     @classmethod
     def _account_matches_any_plan_type(cls, account: dict, plan_types: set[str] | tuple[str, ...] | None = None) -> bool:

@@ -17,6 +17,12 @@
 
 ## 快速开始
 
+### v0.16.2：Free 网页图片入口
+
+新增 `gpt-image-2.5`，在有配额的 Free / 付费网页登录账号上复用现有 `gpt-image-2` 图片请求。界面标注为 **Web 自动**：图片引擎由官网选择，具体版本未知，不是 Flare / Sunburst 选择开关。
+
+旧默认值不变；`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 和 `codex-*` 名称仍走原有付费 Codex 路由。用法、账号来源与验证范围见 [Free Web 接入说明](./docs/free-web-image-integration.zh-CN.md)。使用镜像 `ghcr.io/fujunchao/chatgpt2api:0.16.2`；旧 `v0.16.1` 镜像不包含这个 Web 兼容入口。
+
 ### v0.16.1：生产补丁与 GPT Image 2.5
 
 本版本基于上游 v1.6.0，增加了 Codex 链路的 `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`，保留原 2.0 默认值，并选择性整合图片 HTTP/1.1 与严格断流恢复补丁。
@@ -80,7 +86,7 @@ bun run dev
 后续更新新版本：
 
 ```bash
-docker pull ghcr.io/fujunchao/chatgpt2api:0.16.1
+docker pull ghcr.io/fujunchao/chatgpt2api:0.16.2
 docker-compose down
 docker-compose up -d
 

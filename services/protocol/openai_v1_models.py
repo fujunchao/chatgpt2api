@@ -4,7 +4,7 @@ from typing import Any
 
 from services.account_service import account_service
 from services.openai_backend_api import OpenAIBackendAPI
-from utils.image_models import CODEX_IMAGE_MODELS, CODEX_PREFIXABLE_MODELS
+from utils.image_models import CODEX_IMAGE_MODELS, CODEX_PREFIXABLE_MODELS, WEB_AUTO_IMAGE_MODEL
 from utils.log import logger
 
 
@@ -27,6 +27,11 @@ def list_models() -> dict[str, Any]:
 
     if web_image_accounts:
         dynamic_models.add("gpt-image-2")
+    if any(
+        account_service._account_matches_source_type(account, "web")
+        for account in web_image_accounts
+    ):
+        dynamic_models.add(WEB_AUTO_IMAGE_MODEL)
     if codex_types & {"Plus", "Team", "Pro"}:
         dynamic_models.update(CODEX_IMAGE_MODELS)
     for plan in ("Plus", "Team", "Pro"):
@@ -47,11 +52,14 @@ def list_models() -> dict[str, Any]:
     data = result.get("data")
     if not isinstance(data, list):
         return result
+    # 新入口由本地路由与账号来源决定，不能继承匿名目录的同名能力声明。
+    data = [item for item in data if not isinstance(item, dict) or item.get("id") != WEB_AUTO_IMAGE_MODEL]
+    result["data"] = data
     seen = {str(item.get("id") or "").strip() for item in data if isinstance(item, dict)}
 
     for model in sorted(dynamic_models):
         if model not in seen:
-            data.append({
+            item = {
                 "id": model,
                 "object": "model",
                 "created": 0,
@@ -59,5 +67,11 @@ def list_models() -> dict[str, Any]:
                 "permission": [],
                 "root": model,
                 "parent": None,
-            })
+            }
+            if model == WEB_AUTO_IMAGE_MODEL:
+                item.update({
+                    "description": "ChatGPT Web 图片兼容入口，支持有配额的 Free 网页账号；图片引擎由官网自动选择，具体版本未知，不能指定 Flare / Sunburst。",
+                    "metadata": {"route": "web", "model_selection": "upstream_auto", "variant_selection": False},
+                })
+            data.append(item)
     return result

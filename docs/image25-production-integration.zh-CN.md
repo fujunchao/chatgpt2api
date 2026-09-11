@@ -1,5 +1,7 @@
 # v0.16.1：生产补丁整合与 GPT Image 2.5
 
+本文描述已发布的 `v0.16.1`。`v0.16.2` 新增了 Free 可用的裸 `gpt-image-2.5` Web 自动入口，见 [Free Web 接入说明](./free-web-image-integration.zh-CN.md)；下文历史版本的“裸名称不支持”不适用于 `v0.16.2`。
+
 ## 基线与范围
 
 - 基线：`v1.6.0` / `66fee0c133599fc443997340ca00061a8ee261d9`。

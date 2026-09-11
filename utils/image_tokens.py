@@ -7,7 +7,7 @@ from io import BytesIO
 from typing import Any
 
 from PIL import Image
-from utils.image_models import is_gpt_image_25_model
+from utils.image_models import is_gpt_image_25_model, is_web_auto_image_model
 
 DEFAULT_IMAGE_SIZE = (1024, 1024)
 IMAGE_INPUT_TOKEN_MODEL = "gpt-5.4-mini"
@@ -355,10 +355,10 @@ def resolve_image_usage(
     size: object = None,
     quality: str = "auto",
 ) -> tuple[dict[str, Any] | None, str]:
-    """2.5 不套用旧图片估算公式；缺少上游用量时明确返回未知。"""
+    """Codex 2.5 和 Web 自动入口不套用旧引擎公式；缺少上游用量时返回未知。"""
     if isinstance(upstream_usage, dict) and upstream_usage:
         return upstream_usage, "upstream"
-    if is_gpt_image_25_model(model):
+    if is_gpt_image_25_model(model) or is_web_auto_image_model(model):
         return None, "unavailable"
     return image_usage(
         input_text_tokens=input_text_tokens,

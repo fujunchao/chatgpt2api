@@ -1,4 +1,9 @@
-/** 与后端模型注册表保持一致的界面能力，避免把 2.5 的裸名称误当成 Web 模型。 */
+/** 与后端保持一致：裸 2.5 是 Web 自动入口，带变体的裸名称仍走 Codex。 */
+export function isWebAutoImageModel(model: string): boolean {
+  return model.trim().toLowerCase() === "gpt-image-2.5";
+}
+
+/** 此谓词只识别 Codex 2.5 请求选项，不代表上游已确认图片引擎身份。 */
 export function isGptImage25Model(model: string): boolean {
   return /^(?:gpt-image-2\.5-(?:flare|sunburst)|(?:(?:plus|team|pro)-)?codex-gpt-image-2\.5(?:-(?:flare|sunburst))?)$/.test(
     model.trim().toLowerCase(),
@@ -7,6 +12,22 @@ export function isGptImage25Model(model: string): boolean {
 
 export function isCodexImageModel(model: string): boolean {
   return isGptImage25Model(model) || /^(?:(?:plus|team|pro)-)?codex-gpt-image-2$/.test(model.trim().toLowerCase());
+}
+
+export function imageModelLabel(model: string): string {
+  if (isWebAutoImageModel(model)) return `${model} · Web 自动`;
+  if (isCodexImageModel(model)) return `${model} · Codex`;
+  return model;
+}
+
+export function imageModelDescription(model: string): string {
+  if (isWebAutoImageModel(model)) {
+    return "使用网页账号额度（包括 Free）。复用 gpt-image-2 的网页请求；图片引擎由官网自动选择，具体版本未知，不能指定 Flare / Sunburst。尺寸和质量仅作为提示，以上游实际结果为准。";
+  }
+  if (isCodexImageModel(model)) {
+    return "使用 Codex 图片通道，需 Codex 来源的 Plus / Team / Pro 账号；模型、尺寸和质量参数是否生效，以上游实际结果为准。";
+  }
+  return "";
 }
 
 const baseQualities = [

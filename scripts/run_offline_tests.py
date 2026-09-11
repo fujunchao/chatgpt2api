@@ -18,6 +18,7 @@ NEW_MODULES = [
     "test.test_production_image_recovery",
     "test.test_gpt_image_25",
     "test.test_image_25_protocols",
+    "test.test_free_web_image",
 ]
 BASELINE_MODULES = [
     "test.test_account_export",

@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/fujunchao/chatgpt2api:0.16.1
+    image: ghcr.io/fujunchao/chatgpt2api:0.16.2
     container_name: chatgpt2api
     restart: unless-stopped
     ports:

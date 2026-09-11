@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ImageModel } from "@/lib/api";
-import { imageQualityOptions, isCodexImageModel } from "@/lib/image-models";
+import { imageModelDescription, imageModelLabel, imageQualityOptions, isCodexImageModel } from "@/lib/image-models";
 import { cn } from "@/lib/utils";
 
 type ImageComposerProps = {
@@ -115,7 +115,7 @@ export function ImageComposer({
     [referenceImages],
   );
   const modelOptions = useMemo(
-    () => imageModels.map((model) => ({ value: model, label: model })),
+    () => imageModels.map((model) => ({ value: model, label: imageModelLabel(model) })),
     [imageModels],
   );
   const qualityOptions = imageQualityOptions(imageModel);
@@ -124,6 +124,7 @@ export function ImageComposer({
   const imageSizeLabel = `${qualityLabel} · ${ratioLabel} · ${imageCount || 1} 张`;
   const selectedModelLabel = modelOptions.find((option) => option.value === imageModel)?.label || imageModel;
   const isCodexModel = isCodexImageModel(imageModel);
+  const modelDescription = imageModelDescription(imageModel);
 
   useEffect(() => {
     if (!isSizeMenuOpen) {
@@ -342,7 +343,7 @@ export function ImageComposer({
                     {isSizeMenuOpen ? (
                       <div
                         ref={sizeMenuRef}
-                        className="fixed z-[80] max-h-[62dvh] overflow-y-auto rounded-[24px] border border-stone-200/70 bg-white p-4 shadow-[0_30px_90px_-34px_rgba(15,23,42,0.42)] sm:max-h-none sm:overflow-visible"
+                        className="fixed z-[80] max-h-[62dvh] overflow-y-auto rounded-[24px] border border-stone-200/70 bg-white p-4 shadow-[0_30px_90px_-34px_rgba(15,23,42,0.42)]"
                         style={{
                           top: sizeMenuPos.top,
                           left: sizeMenuPos.left,
@@ -388,6 +389,11 @@ export function ImageComposer({
                               ))}
                             </SelectContent>
                           </Select>
+                          {modelDescription ? (
+                            <p className="mt-2 text-xs leading-relaxed text-stone-500" role="note">
+                              {modelDescription}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="mb-3">
                           <div className="mb-2 text-sm font-medium text-stone-900">质量</div>
