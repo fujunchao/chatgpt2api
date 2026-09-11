@@ -12,7 +12,7 @@ RUN npm install
 COPY VERSION /app/VERSION
 COPY CHANGELOG.md /app/CHANGELOG.md
 COPY web ./
-RUN NEXT_PUBLIC_APP_VERSION="$(cat /app/VERSION)" npm run build
+RUN NEXT_PUBLIC_APP_VERSION="$(cat /app/VERSION)" npm run build -- --webpack
 
 
 FROM --platform=$TARGETPLATFORM python:3.13-slim AS app
@@ -45,6 +45,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY main.py ./
 COPY config.json ./
 COPY VERSION ./
+COPY LICENSE ./
 COPY api ./api
 COPY services ./services
 COPY utils ./utils
@@ -53,4 +54,4 @@ COPY --from=web-build /app/web/out ./web_dist
 
 EXPOSE 80
 
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--access-log"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--access-log"]

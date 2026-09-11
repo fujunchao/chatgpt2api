@@ -9,6 +9,12 @@ __pycache__
 
 web/.next
 web/node_modules
+web/out
+web_dist
+data
+.env
+.env.*
+C2A-Production-Patches-*.zip
 
 assets
 README.md

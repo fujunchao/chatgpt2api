@@ -12,17 +12,19 @@ from urllib.parse import urlparse
 from curl_cffi import requests
 from fastapi import HTTPException
 from services.proxy_service import proxy_settings
+from utils.image_models import (
+    BASE_IMAGE_MODELS,
+    CODEX_IMAGE_MODEL,
+    IMAGE_MODEL_PLAN_TYPES,
+    IMAGE_MODELS,
+    PREFIXED_CODEX_IMAGE_MODELS,
+    PUBLIC_IMAGE_MODELS,
+    is_codex_image_model,
+    is_supported_image_model,
+    split_image_model,
+)
 from utils.log import logger
 
-BASE_IMAGE_MODELS = {"gpt-image-2", "codex-gpt-image-2"}
-IMAGE_MODEL_PLAN_TYPES = ("plus", "team", "pro")
-CODEX_IMAGE_MODEL = "codex-gpt-image-2"
-PREFIXED_CODEX_IMAGE_MODELS = {
-    f"{plan_type}-{CODEX_IMAGE_MODEL}"
-    for plan_type in IMAGE_MODEL_PLAN_TYPES
-}
-IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS
-PUBLIC_IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS
 OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 
 SUPPORTED_JSON_IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
@@ -104,31 +106,6 @@ def normalize_json_edit_images(image: object = None, images: object = None) -> l
 
 def new_uuid() -> str:
     return str(uuid.uuid4())
-
-
-def split_image_model(model: object) -> tuple[str | None, str | None]:
-    normalized = str(model or "").strip().lower()
-    if not normalized:
-        return None, None
-    if normalized in BASE_IMAGE_MODELS:
-        return None, normalized
-    for plan_type in IMAGE_MODEL_PLAN_TYPES:
-        prefix = f"{plan_type}-"
-        if normalized.startswith(prefix):
-            base_model = normalized[len(prefix):]
-            if base_model == CODEX_IMAGE_MODEL:
-                return plan_type, base_model
-    return None, None
-
-
-def is_supported_image_model(model: object) -> bool:
-    _, base_model = split_image_model(model)
-    return base_model is not None
-
-
-def is_codex_image_model(model: object) -> bool:
-    _, base_model = split_image_model(model)
-    return base_model == CODEX_IMAGE_MODEL
 
 
 def is_image_chat_request(body: dict[str, object]) -> bool:

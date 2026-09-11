@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ImageModel } from "@/lib/api";
+import { imageQualityOptions, isCodexImageModel } from "@/lib/image-models";
 import { cn } from "@/lib/utils";
 
 type ImageComposerProps = {
@@ -57,18 +58,12 @@ function getDraggedImageFiles(dataTransfer: DataTransfer) {
   return Array.from(dataTransfer.files || []).filter(isImageFile);
 }
 
-const qualityOptions = [
-  { value: "auto", label: "自动" },
-  { value: "low", label: "低" },
-  { value: "medium", label: "中" },
-  { value: "high", label: "高" },
-];
 const aspectOptions = [
   { ratio: "1:1", tier: "1k", width: "1024", height: "1024", label: "1:1", icon: Square },
   { ratio: "2:3", tier: "1k", width: "1024", height: "1536", label: "2:3", icon: RectangleVertical },
   { ratio: "3:2", tier: "1k", width: "1536", height: "1024", label: "3:2", icon: RectangleHorizontal },
-  { ratio: "3:4", tier: "1k", width: "1024", height: "1365", label: "3:4", icon: RectangleVertical },
-  { ratio: "4:3", tier: "1k", width: "1365", height: "1024", label: "4:3", icon: RectangleHorizontal },
+  { ratio: "3:4", tier: "1k", width: "1008", height: "1344", label: "3:4", icon: RectangleVertical },
+  { ratio: "4:3", tier: "1k", width: "1344", height: "1008", label: "4:3", icon: RectangleHorizontal },
   { ratio: "9:16", tier: "1k", width: "1088", height: "1920", label: "9:16", icon: RectangleVertical },
   { ratio: "16:9", tier: "1k", width: "1920", height: "1088", label: "16:9", icon: RectangleHorizontal },
   { ratio: "1:1", tier: "2k", width: "2048", height: "2048", label: "1:1(2k)", icon: Square },
@@ -123,11 +118,12 @@ export function ImageComposer({
     () => imageModels.map((model) => ({ value: model, label: model })),
     [imageModels],
   );
+  const qualityOptions = imageQualityOptions(imageModel);
   const qualityLabel = qualityOptions.find((option) => option.value === imageQuality)?.label || "自动";
   const ratioLabel = imageRatio === "auto" ? "auto" : `${imageRatio}(${imageTier})`;
   const imageSizeLabel = `${qualityLabel} · ${ratioLabel} · ${imageCount || 1} 张`;
   const selectedModelLabel = modelOptions.find((option) => option.value === imageModel)?.label || imageModel;
-  const isCodexModel = imageModel.toLowerCase().includes("codex");
+  const isCodexModel = isCodexImageModel(imageModel);
 
   useEffect(() => {
     if (!isSizeMenuOpen) {

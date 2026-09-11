@@ -33,3 +33,8 @@ git_cache/
 loginwithpassword_*/
 logwithemailverifycode_*/
 test_batch_output/
+
+# 本地生产覆盖包与含机器路径的研究笔记不随公开发布上传。
+C2A-Production-Patches-*.zip
+docs/project-understanding.zh-CN.md
+docs/gpt-image-2.5-*.zh-CN.md

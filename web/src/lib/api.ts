@@ -273,9 +273,20 @@ export type SystemLog = {
   [key: string]: unknown;
 };
 
+export type ImageUsageSource = "upstream" | "estimated" | "unavailable";
+export type ImageUsage = {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens?: number;
+  input_tokens_details?: Record<string, number>;
+  output_tokens_details?: Record<string, number>;
+};
+
 export type ImageResponse = {
   created: number;
   data: Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
+  usage?: ImageUsage;
+  usage_source?: ImageUsageSource;
 };
 
 export type ImageTask = {
@@ -293,6 +304,8 @@ export type ImageTask = {
   progress?: string;
   elapsed_secs?: number;
   duration_ms?: number;
+  usage?: ImageUsage;
+  usage_source?: ImageUsageSource;
 };
 
 type ImageTaskListResponse = {

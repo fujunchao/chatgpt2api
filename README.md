@@ -17,10 +17,16 @@
 
 ## 快速开始
 
+### v0.16.1：生产补丁与 GPT Image 2.5
+
+本版本基于上游 v1.6.0，增加了 Codex 链路的 `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`，保留原 2.0 默认值，并选择性整合图片 HTTP/1.1 与严格断流恢复补丁。
+
+账号须满足 Codex 来源及 Plus/Team/Pro 条件；新增名称不会静默降级成旧图片模型。部署、别名、用量来源和验证范围见 [整合说明](./docs/image25-production-integration.zh-CN.md)。源码构建使用 `docker compose -f docker-compose.image25.yml up -d --build`；不要继续叠加旧生产包的两个源码覆盖挂载。
+
 ### Docker 运行
 
 ```bash
-git clone git@github.com:basketikun/chatgpt2api.git
+git clone https://github.com/fujunchao/chatgpt2api.git
 cd chatgpt2api
 docker compose up -d
 ```
@@ -57,7 +63,7 @@ docker compose -f docker-compose.warp.yml up -d --build
 启动后端：
 
 ```bash
-git clone git@github.com:basketikun/chatgpt2api.git
+git clone https://github.com/fujunchao/chatgpt2api.git
 cd chatgpt2api
 uv sync
 uv run main.py
@@ -74,7 +80,7 @@ bun run dev
 后续更新新版本：
 
 ```bash
-docker pull ghcr.io/basketikun/chatgpt2api:latest
+docker pull ghcr.io/fujunchao/chatgpt2api:0.16.1
 docker-compose down
 docker-compose up -d
 

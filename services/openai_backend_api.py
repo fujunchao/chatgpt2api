@@ -17,12 +17,14 @@ from typing import Any, Dict, Iterator, Optional
 from urllib.parse import unquote, urlparse
 
 from curl_cffi import requests
+from curl_cffi.const import CurlHttpVersion
 from PIL import Image
 
 from services.account_service import account_service
 from services.config import config
 from services.proxy_service import proxy_settings
 from utils.helper import UpstreamHTTPError, ensure_ok, iter_sse_payloads, new_uuid, split_image_model
+from utils.image_models import CODEX_IMAGE_MODEL, codex_tool_model, validate_image_options
 from utils.log import logger
 from utils.pow import build_legacy_requirements_token, build_proof_token, parse_pow_resources
 from utils.turnstile import solve_turnstile_token
@@ -34,6 +36,15 @@ class InvalidAccessTokenError(RuntimeError):
 
 class ImagePollTimeoutError(RuntimeError):
     pass
+
+
+class ImageStreamInterruptedError(RuntimeError):
+    """图片提交阶段断流；保留本次消息 ID，供调用方严格定位已提交会话。"""
+
+    def __init__(self, message: str, message_id: str, started_at: float):
+        super().__init__(message)
+        self.message_id = message_id
+        self.started_at = started_at
 
 
 class ImageContentPolicyError(RuntimeError):
@@ -54,7 +65,6 @@ class ChatRequirements:
 DEFAULT_CLIENT_VERSION = "prod-a194cd50d4416d3c0b47c740f206b12ce60f5887"
 DEFAULT_CLIENT_BUILD_NUMBER = "6708908"
 DEFAULT_POW_SCRIPT = "https://chatgpt.com/backend-api/sentinel/sdk.js"
-CODEX_IMAGE_MODEL = "codex-gpt-image-2"
 CODEX_RESPONSES_MODEL = "gpt-5.5"
 SEARCH_MODEL = "gpt-5-5"
 SEARCH_TIMEOUT_SECS = 300.0
@@ -167,6 +177,7 @@ class OpenAIBackendAPI:
         self.pow_script_sources: list[str] = []
         self.pow_data_build = ""
         self.progress_callback: Callable[[str], None] | None = None
+        self.image_request_accepted = False
         self.session = requests.Session(**proxy_settings.build_session_kwargs(
             account=self.account,
             impersonate=self.fp["impersonate"],
@@ -759,10 +770,13 @@ class OpenAIBackendAPI:
             images: list[str] | None = None,
             size: str | None = None,
             quality: str = "auto",
+            model: str = CODEX_IMAGE_MODEL,
     ) -> Iterator[Dict[str, Any]]:
         if not self.access_token:
             raise RuntimeError("access_token is required for codex image endpoints")
         self._ensure_codex_source_account()
+        tool_model = codex_tool_model(model)
+        size, quality = validate_image_options(model, size, quality)
         path = "/backend-api/codex/responses"
         payload = {
             "model": CODEX_RESPONSES_MODEL,
@@ -771,7 +785,7 @@ class OpenAIBackendAPI:
             "input": self._codex_image_input(prompt, images or []),
             "tools": [{
                 "type": "image_generation",
-                "model": "gpt-image-2",
+                "model": tool_model,
                 "action": "edit" if images else "generate",
                 "size": str(size or "1024x1024"),
                 "quality": str(quality or "auto"),
@@ -809,6 +823,7 @@ class OpenAIBackendAPI:
                 "localhost": auth_claim.get("localhost"),
             },
             "request": {
+                "requested_image_model": model,
                 "model": payload.get("model"),
                 "tool_model": tool.get("model"),
                 "tool_action": tool.get("action"),
@@ -827,11 +842,19 @@ class OpenAIBackendAPI:
                 if key.lower() != "authorization"
             },
         })
+        started_at = time.time()
         try:
             with urllib.request.urlopen(request, timeout=1200) as raw:
+                self.image_request_accepted = True
                 yield from self._iter_codex_response_events(raw)
         except urllib.error.HTTPError as error:
-            body_text = error.read().decode("utf-8", "replace")
+            try:
+                body_text = error.read().decode("utf-8", "replace")
+            except Exception:
+                # 错误响应体也可能截断（如 IncompleteRead），仍须保留已经收到的 HTTP 状态。
+                body_text = ""
+            finally:
+                error.close()
             body: Any = body_text
             try:
                 body = json.loads(body_text)
@@ -841,6 +864,9 @@ class OpenAIBackendAPI:
             retry_after_header = error.headers.get("Retry-After") if error.headers else None
             retry_after = int(retry_after_header) if str(retry_after_header or "").isdigit() else None
             raise UpstreamHTTPError(path, error.code, body, retry_after=retry_after) from error
+        except OSError as exc:
+            # Codex 没有本项目可用的会话恢复入口，提交状态不明时不能自动再出一张。
+            raise ImageStreamInterruptedError(str(exc), "", started_at) from exc
 
     def _prepare_image_conversation(self, prompt: str, requirements: ChatRequirements, model: str) -> str:
         """为图片生成准备 conduit token。"""
@@ -948,8 +974,10 @@ class OpenAIBackendAPI:
         }
 
     def _start_image_generation(self, prompt: str, requirements: ChatRequirements, conduit_token: str, model: str,
-                                references: Optional[list[Dict[str, Any]]] = None) -> requests.Response:
+                                references: Optional[list[Dict[str, Any]]] = None,
+                                *, message_id: str | None = None) -> requests.Response:
         """启动图片生成或编辑的 SSE 请求。"""
+        self.image_request_accepted = False
         references = references or []
         parts = [{
             "content_type": "image_asset_pointer",
@@ -980,7 +1008,7 @@ class OpenAIBackendAPI:
         payload = {
             "action": "next",
             "messages": [{
-                "id": new_uuid(),
+                "id": message_id or new_uuid(),
                 "author": {"role": "user"},
                 "create_time": time.time(),
                 "content": content,
@@ -1014,17 +1042,25 @@ class OpenAIBackendAPI:
             self.base_url + path,
             headers=self._image_headers(path, requirements, conduit_token, "text/event-stream"),
             json=payload,
-            timeout=300,
+            # 合入生产补丁：仅图片 SSE 使用 HTTP/1.1，避免 curl 92 断流。
+            # 提交阶段超时/断流由上层按本次消息 ID 恢复，不能直接重复提交。
+            timeout=(30, 90),
             stream=True,
+            http_version=CurlHttpVersion.V1_1,
         )
-        ensure_ok(response, path)
+        try:
+            ensure_ok(response, path)
+        except Exception:
+            response.close()
+            raise
+        self.image_request_accepted = True
         return response
 
-    def _get_conversation(self, conversation_id: str) -> Dict[str, Any]:
+    def _get_conversation(self, conversation_id: str, timeout_secs: float = 60.0) -> Dict[str, Any]:
         """获取完整 conversation 详情。"""
         path = f"/backend-api/conversation/{conversation_id}"
         response = self.session.get(self.base_url + path, headers=self._headers(path, {"Accept": "application/json"}),
-                                    timeout=60)
+                                    timeout=timeout_secs)
         ensure_ok(response, path)
         return response.json()
 
@@ -1132,6 +1168,45 @@ class OpenAIBackendAPI:
                     "updated_at": updated_at,
                 })
                 return conv_id
+        return ""
+
+    def find_conversation_by_message_id(self, message_id: str, started_at: float, timeout_secs: float = 10.0) -> str:
+        """按本次客户端消息 ID 恢复；不按标题或“最新会话”猜测结果归属。"""
+        if not message_id or started_at <= 0 or timeout_secs <= 0:
+            return ""
+        deadline = time.monotonic() + timeout_secs
+        items = self._list_recent_conversations(limit=10, timeout_secs=timeout_secs)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            conversation_id = str(item.get("id") or item.get("conversation_id") or "")
+            if not conversation_id:
+                continue
+            try:
+                updated_at = float(item.get("update_time") or item.get("updated_at") or 0)
+            except (TypeError, ValueError):
+                updated_at = 0
+            if updated_at and (updated_at < started_at - 30 or updated_at > time.time() + 30):
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                detail = self._get_conversation(conversation_id, timeout_secs=remaining)
+            except Exception:
+                continue
+            mapping = detail.get("mapping") if isinstance(detail, dict) else None
+            if not isinstance(mapping, dict):
+                continue
+            for node in mapping.values():
+                message = node.get("message") if isinstance(node, dict) else None
+                author = message.get("author") if isinstance(message, dict) else None
+                if (
+                    isinstance(message, dict)
+                    and message.get("id") == message_id
+                    and isinstance(author, dict) and author.get("role") == "user"
+                ):
+                    return conversation_id
         return ""
 
     @staticmethod
@@ -2587,12 +2662,25 @@ class OpenAIBackendAPI:
         self._report_progress("preparing_conversation")
         conduit_token = self._prepare_image_conversation(prompt, requirements, model)
         self._report_progress("starting_generation")
-        response = self._start_image_generation(prompt, requirements, conduit_token, model, references)
-        self._report_progress("generating")
+        # 标识在预热和 prepare 完成后创建，提交前错误不会进入已提交会话恢复。
+        message_id = new_uuid()
+        started_at = time.time()
+        response = None
         try:
+            response = self._start_image_generation(
+                prompt, requirements, conduit_token, model, references, message_id=message_id,
+            )
+            self._report_progress("generating")
             yield from iter_sse_payloads(response)
+        except Exception as exc:
+            if isinstance(exc, UpstreamHTTPError):
+                raise
+            if getattr(exc, "code", None) in {28, 92} or re.search(r"curl:\s*\((?:28|92)\)", str(exc), re.I):
+                raise ImageStreamInterruptedError(str(exc), message_id, started_at) from exc
+            raise
         finally:
-            response.close()
+            if response is not None:
+                response.close()
 
     def _bootstrap(self) -> None:
         """预热首页，并提取 PoW 相关脚本引用。"""

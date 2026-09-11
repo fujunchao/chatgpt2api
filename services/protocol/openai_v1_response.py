@@ -29,10 +29,10 @@ from services.protocol.web_search_tool import (
     text_with_url_citations,
 )
 from utils.helper import extract_image_from_message_content, extract_response_prompt, has_response_image_generation_tool
+from utils.image_models import is_supported_image_model
 from utils.image_tokens import (
     count_image_content_tokens,
-    count_image_output_items_tokens,
-    image_usage,
+    resolve_image_usage,
     token_usage,
 )
 
@@ -105,17 +105,23 @@ def extract_response_image(input_value: object) -> tuple[bytes, str] | None:
 
 def _input_image_parts(input_value: object) -> list[dict[str, Any]]:
     parts: list[dict[str, Any]] = []
+    content_types = RESPONSE_CONTENT_PART_TYPES
     if isinstance(input_value, dict):
+        if input_value.get("type") in content_types:
+            return [input_value]
         content = input_value.get("content")
         if isinstance(content, list):
             parts.extend(item for item in content if isinstance(item, dict))
         return parts
     if not isinstance(input_value, list):
         return parts
-    if all(isinstance(item, dict) and item.get("type") for item in input_value):
+    if all(isinstance(item, dict) and item.get("type") in content_types for item in input_value):
         return [item for item in input_value if isinstance(item, dict)]
     for item in input_value:
         if isinstance(item, dict):
+            if item.get("type") in content_types:
+                parts.append(item)
+                continue
             content = item.get("content")
             if isinstance(content, list):
                 parts.extend(part for part in content if isinstance(part, dict))
@@ -268,6 +274,7 @@ def response_completed(
     created: int,
     output: list[dict[str, Any]],
     usage: dict[str, Any] | None = None,
+    usage_source: str = "",
 ) -> dict[str, Any]:
     response = {
         "type": "response.completed",
@@ -285,6 +292,8 @@ def response_completed(
     }
     if usage:
         response["response"]["usage"] = usage
+    if usage_source:
+        response["response"]["usage_source"] = usage_source
     return response
 
 
@@ -366,6 +375,7 @@ def stream_image_response(
     input_image_tokens: int = 0,
     size: object = None,
     quality: str = "auto",
+    image_model: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     response_id = f"resp_{uuid.uuid4().hex}"
     created = int(time.time())
@@ -388,14 +398,16 @@ def stream_image_response(
             continue
         items = image_output_items(prompt, output.data)
         if items:
-            usage = image_usage(
+            usage, source = resolve_image_usage(
+                model=image_model or output.model,
+                upstream_usage=output.usage, items=output.data,
                 input_text_tokens=count_text_tokens(prompt, model),
                 input_image_tokens=input_image_tokens,
-                output_tokens=count_image_output_items_tokens(output.data, size, quality),
+                size=size, quality=quality,
             )
             for output_index, item in enumerate(items):
                 yield {"type": "response.output_item.done", "output_index": output_index, "item": item}
-            yield response_completed(response_id, model, created, items, usage)
+            yield response_completed(response_id, model, created, items, usage, source)
             return
     raise RuntimeError("image generation failed")
 
@@ -426,24 +438,33 @@ def response_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
     prompt = extract_response_prompt(body.get("input"))
     if not prompt:
         raise HTTPException(status_code=400, detail={"error": "input text is required"})
-    model = str(body.get("model") or "gpt-image-2").strip() or "gpt-image-2"
-    image_info = extract_response_image(body.get("input"))
-    if image_info:
-        image_data, mime_type = image_info
-        images = encode_images([(image_data, "image.png", mime_type)])
-    else:
-        images = None
-    input_image_tokens = count_image_content_tokens(_input_image_parts(body.get("input")), model)
     tool = response_image_tool(body)
+    requested_model = str(body.get("model") or "").strip()
+    # 顶层是对话模型；工具中的 model 才选择图片模型，同时兼容旧的顶层图片别名。
+    image_model = str(tool.get("model") or "").strip() or (
+        requested_model if is_supported_image_model(requested_model) else "gpt-image-2"
+    )
+    if not is_supported_image_model(image_model):
+        raise HTTPException(status_code=400, detail={"error": "unsupported image_generation tool model"})
+    model = requested_model or image_model
+    parts = _input_image_parts(body.get("input"))
+    image_inputs = extract_image_from_message_content(parts)
+    images = encode_images([
+        (data, f"image_{index}.png", mime) for index, (data, mime) in enumerate(image_inputs, start=1)
+    ]) or None
+    input_image_tokens = count_image_content_tokens(parts, image_model)
     image_outputs = stream_image_outputs_with_pool(ConversationRequest(
         prompt=prompt,
-        model=model,
+        model=image_model,
         size=tool.get("size"),
         quality=str(tool.get("quality") or "auto"),
         response_format="b64_json",
         images=images,
     ))
-    yield from stream_image_response(image_outputs, prompt, model, input_image_tokens, tool.get("size"), str(tool.get("quality") or "auto"))
+    yield from stream_image_response(
+        image_outputs, prompt, model, input_image_tokens,
+        tool.get("size"), str(tool.get("quality") or "auto"), image_model=image_model,
+    )
 
 
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:

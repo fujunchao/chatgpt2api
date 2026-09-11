@@ -7,6 +7,7 @@ from io import BytesIO
 from typing import Any
 
 from PIL import Image
+from utils.image_models import is_gpt_image_25_model
 
 DEFAULT_IMAGE_SIZE = (1024, 1024)
 IMAGE_INPUT_TOKEN_MODEL = "gpt-5.4-mini"
@@ -322,6 +323,48 @@ def image_usage(
         input_image_tokens=input_image_tokens,
         output_image_tokens=output_tokens,
     )
+
+
+def sum_token_usages(usages: list[dict[str, Any]]) -> dict[str, Any]:
+    """合并独立上游调用的用量，只累加数值计数，不复制任意响应元数据。"""
+    def merge_counters(target: dict[str, Any], source: dict[str, Any]) -> None:
+        for key, value in source.items():
+            if isinstance(value, dict):
+                nested = target.setdefault(key, {})
+                if isinstance(nested, dict):
+                    merge_counters(nested, value)
+            elif isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+                target[key] = target.get(key, 0) + value
+
+    result: dict[str, Any] = {}
+    keys = {"input_tokens", "output_tokens", "total_tokens", "input_tokens_details", "output_tokens_details"}
+    for usage in usages:
+        merge_counters(result, {key: value for key, value in usage.items() if key in keys})
+    if usages and any("total_tokens" not in usage for usage in usages):
+        result["total_tokens"] = result.get("input_tokens", 0) + result.get("output_tokens", 0)
+    return result
+
+
+def resolve_image_usage(
+    *,
+    model: str,
+    upstream_usage: object,
+    input_text_tokens: int,
+    items: object,
+    input_image_tokens: int = 0,
+    size: object = None,
+    quality: str = "auto",
+) -> tuple[dict[str, Any] | None, str]:
+    """2.5 不套用旧图片估算公式；缺少上游用量时明确返回未知。"""
+    if isinstance(upstream_usage, dict) and upstream_usage:
+        return upstream_usage, "upstream"
+    if is_gpt_image_25_model(model):
+        return None, "unavailable"
+    return image_usage(
+        input_text_tokens=input_text_tokens,
+        input_image_tokens=input_image_tokens,
+        output_tokens=count_image_output_items_tokens(items, size, quality),
+    ), "estimated"
 
 
 def chat_usage_from_image_usage(usage: dict[str, Any]) -> dict[str, Any]:

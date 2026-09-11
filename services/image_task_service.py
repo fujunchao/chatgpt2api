@@ -78,6 +78,8 @@ def _public_task(task: dict[str, Any]) -> dict[str, Any]:
         item["data"] = task.get("data")
     if task.get("usage") is not None:
         item["usage"] = task.get("usage")
+    if task.get("usage_source"):
+        item["usage_source"] = task.get("usage_source")
     if task.get("error"):
         item["error"] = task.get("error")
     if task.get("progress"):
@@ -275,7 +277,10 @@ class ImageTaskService:
                 raise error
             usage = result.get("usage")
             duration_ms = int((time.time() - started) * 1000)
-            self._update_task(key, status=TASK_STATUS_SUCCESS, data=data, usage=usage, error="", duration_ms=duration_ms)
+            self._update_task(
+                key, status=TASK_STATUS_SUCCESS, data=data, usage=usage,
+                usage_source=result.get("usage_source", ""), error="", duration_ms=duration_ms,
+            )
             self._log_call(
                 identity,
                 mode,
@@ -398,6 +403,8 @@ class ImageTaskService:
             usage = item.get("usage")
             if isinstance(usage, dict):
                 task["usage"] = usage
+            if item.get("usage_source") in {"upstream", "estimated", "unavailable"}:
+                task["usage_source"] = item["usage_source"]
             error = _clean(item.get("error"))
             if error:
                 task["error"] = error

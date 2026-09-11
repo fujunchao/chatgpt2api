@@ -30,6 +30,7 @@ import {
   type ImageTask,
 } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
+import { normalizeImageQuality } from "@/lib/image-models";
 import { useSettingsStore } from "@/app/settings/store";
 import {
   clearImageConversations,
@@ -470,6 +471,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   const [imageHeight, setImageHeight] = useState("1024");
   const [imageQuality, setImageQuality] = useState("auto");
   const [imageModel, setImageModel] = useState<ImageModel>("gpt-image-2");
+  const [modelPreferenceLoaded, setModelPreferenceLoaded] = useState(false);
   const [imageModels, setImageModels] = useState<ImageModel[]>(["gpt-image-2"]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [referenceImageFiles, setReferenceImageFiles] = useState<File[]>([]);
@@ -610,13 +612,18 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_TIER_STORAGE_KEY) : null;
       const storedQuality =
         typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_QUALITY_STORAGE_KEY) : null;
+      const storedModel =
+        typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_MODEL_STORAGE_KEY) : null;
       const storedCount =
         typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_COUNT_STORAGE_KEY) : null;
       setImageRatio(storedRatio || "1:1");
       setImageTier(storedTier || "1k");
       setImageWidth("1024");
       setImageHeight("1024");
-      setImageQuality(storedQuality || "auto");
+      const restoredModel = storedModel?.trim() || "gpt-image-2";
+      setImageModel(restoredModel);
+      setImageQuality(normalizeImageQuality(restoredModel, storedQuality || "auto"));
+      setModelPreferenceLoaded(true);
       setImageCount(storedCount ? clampImageCount(storedCount) : "1");
 
       const items = await listImageConversations();
@@ -851,7 +858,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   }, [selectedConversationId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !modelPreferenceLoaded) {
       return;
     }
 
@@ -859,7 +866,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     window.localStorage.setItem(IMAGE_TIER_STORAGE_KEY, imageTier);
     window.localStorage.setItem(IMAGE_QUALITY_STORAGE_KEY, imageQuality);
     window.localStorage.setItem(IMAGE_MODEL_STORAGE_KEY, imageModel);
-  }, [imageRatio, imageTier, imageQuality, imageModel]);
+  }, [imageRatio, imageTier, imageQuality, imageModel, modelPreferenceLoaded]);
+
+  useEffect(() => {
+    if (modelPreferenceLoaded) {
+      setImageQuality((quality) => normalizeImageQuality(imageModel, quality));
+    }
+  }, [imageModel, modelPreferenceLoaded]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && parsedCount > 0) {

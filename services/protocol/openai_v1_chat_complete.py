@@ -33,8 +33,7 @@ from utils.helper import build_chat_image_markdown_content, extract_chat_image, 
 from utils.image_tokens import (
     chat_usage_from_image_usage,
     count_image_inputs_tokens,
-    count_image_output_items_tokens,
-    image_usage,
+    resolve_image_usage,
 )
 
 TOOL_UNAVAILABLE_SYSTEM_MESSAGE = (
@@ -235,16 +234,23 @@ def image_chat_response(body: dict[str, Any]) -> dict[str, Any]:
         prompt=prompt,
         model=model,
         n=n,
+        size=body.get("size"),
+        quality=str(body.get("quality") or "auto"),
         response_format="b64_json",
         images=encode_images(images) or None,
     )))
     response = completion_response(model, image_result_content(result), int(result.get("created") or 0) or None)
-    usage = image_usage(
+    usage, source = resolve_image_usage(
+        model=model, upstream_usage=result.get("usage"), items=result.get("data"),
         input_text_tokens=count_text_tokens(prompt, model),
         input_image_tokens=count_image_inputs_tokens(images, model),
-        output_tokens=count_image_output_items_tokens(result.get("data")),
+        size=body.get("size"), quality=str(body.get("quality") or "auto"),
     )
-    response["usage"] = chat_usage_from_image_usage(usage)
+    if usage is not None:
+        response["usage"] = chat_usage_from_image_usage(usage)
+    else:
+        response.pop("usage", None)
+    response["usage_source"] = source
     return response
 
 
@@ -254,6 +260,8 @@ def image_chat_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
         prompt=prompt,
         model=model,
         n=n,
+        size=body.get("size"),
+        quality=str(body.get("quality") or "auto"),
         response_format="b64_json",
         images=encode_images(images) or None,
     ))
