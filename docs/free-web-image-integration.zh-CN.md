@@ -1,6 +1,8 @@
 # Free 网页账号图片入口
 
-适用版本：`v0.16.2`，在 `v0.16.1` 基础上新增 Free 网页图片入口，保留原有 Codex 路由和生产传输补丁。
+适用版本：`v0.16.3`。`v0.16.2` 引入 Free 网页图片入口，`v0.16.3` 补齐内置 OAuth 网页登录来源，保留原有 Codex 路由和生产传输补丁。
+
+内置浏览器 OAuth 登录会记录 `source_type=oauth_login`。`v0.16.2` 漏掉了这一来源，即使 Free 账号正常且有配额，也可能不显示 `gpt-image-2.5`。`v0.16.3` 已补齐模型目录和选号共用的来源判断；无需修改现有账号的来源记录。
 
 ## 实现目标
 
@@ -12,12 +14,12 @@
 
 | 请求名称 | 通道 / 账号条件 | 实际选择方式 |
 | --- | --- | --- |
-| `gpt-image-2.5` | Web：`web`、`password` 或默认 Web 来源；正常且有图片额度的 Free / 付费账号 | 与旧 `gpt-image-2` 相同：对话 `model=gpt-5-3` 和 `system_hints=["picture_v2"]`，图片引擎由官网选择 |
+| `gpt-image-2.5` | Web：`web`、`password`、`oauth_login` 或默认 Web 来源；正常且有图片额度的 Free / 付费账号 | 与旧 `gpt-image-2` 相同：对话 `model=gpt-5-3` 和 `system_hints=["picture_v2"]`，图片引擎由官网选择 |
 | `gpt-image-2` | 保持原 Web 入口及原选号策略 | 不改变默认值、提示词、尺寸/质量传递或上游参数 |
 | `gpt-image-2.5-flare` / `gpt-image-2.5-sunburst` | 保持 Codex 来源及 Plus / Team / Pro 条件 | 保持原图片工具请求参数；没有改成 Web 后备路径 |
 | `codex-gpt-image-2.5*` / 既有套餐前缀 | 保持现有 Codex 路由 | 不更换工具模型映射，不降低账号条件 |
 
-新 Web 入口在本地初筛和远端账号刷新后都验证来源；不会因为 Web 配额耗尽就使用 Codex 账号或付费 API。`password` 只是网页登录来源的一种存储标记，不修改登录流程和账号记录的来源值。
+新 Web 入口在本地初筛和远端账号刷新后都验证来源；不会因为 Web 配额耗尽就使用 Codex 账号或付费 API。`password` 和 `oauth_login` 都是网页登录来源的存储标记，不修改登录流程和账号记录的来源值。
 
 “Web 自动”描述的是**图片引擎由官网选择**，并不意味着本次把顶层对话 `model` 改成了字面值 `auto`。由于旧请求已被用户验证成功，本次保留其上游对话参数；将来如有协议变化，再依据该账号的实际请求单独适配。
 
@@ -89,7 +91,9 @@ JSON 编辑、多参考图、`stream=true`、Chat 图片模式及后台图片任
 
 ## 验证范围
 
-2026-09-11 本地验证：181 项后端离线回归、4 项前端逻辑测试、独立 TypeScript 类型检查和前端生产构建全部通过。
+2026-09-11 本地验证：182 项后端离线回归、4 项前端逻辑测试、独立 TypeScript 类型检查和前端生产构建全部通过。
+
+OAuth 来源回归从 `/api/accounts/oauth/finish` 的真实入库流程开始，再验证 `/v1/models` 和 Web 图片调用，避免仅手工构造 `source_type=web` 测试数据而遗漏登录入口。
 
 离线回归通过真实 HTTP 兼容入口、账号池筛选、Web 请求构造、参考图上传构造及 SSE 解析，只模拟外部 HTTP、账号健康检查与图片下载。使用虚构账号、隔离配置与临时存储，禁止外连。
 
@@ -98,7 +102,7 @@ JSON 编辑、多参考图、`stream=true`、Chat 图片模式及后台图片任
 - Free 模型目录、Web 自动说明、匿名目录同名项去重；
 - 新旧入口 prepare/submit 请求语义一致、HTTP/1.1 保留；
 - Free 文生图、multipart 多参考图与 JSON 编辑；
-- password/default Web 来源、混合 Codex 账号池、配额/禁用/限流、刷新后来源变化；
+- password/default Web 来源、内置 OAuth 登录完成后的目录与调用、混合 Codex 账号池、配额/禁用/限流、刷新后来源变化；
 - 原 Codex 变体不回退 Web；
 - 流式、Chat、Responses、后台任务和未知用量。
 
@@ -110,7 +114,7 @@ node node_modules/typescript/bin/tsc --noEmit --incremental false
 npm run build -- --webpack
 ```
 
-用户对旧入口的成功反馈不等于本次独立运行了新入口的真实上游出图测试；本次隔离测试也不确认实际图片引擎身份。请使用 `ghcr.io/fujunchao/chatgpt2api:0.16.2` 或本版本源码构建；旧 `v0.16.1` 镜像不包含这个入口。
+用户对旧入口的成功反馈不等于本次独立运行了新入口的真实上游出图测试；本次隔离测试也不确认实际图片引擎身份。请使用 `ghcr.io/fujunchao/chatgpt2api:0.16.3` 或本版本源码构建；旧 `v0.16.2` 镜像不包含 OAuth 来源修复。
 
 ## 参考实现
 

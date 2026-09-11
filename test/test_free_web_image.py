@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from curl_cffi.const import CurlHttpVersion
 
-from api import ai
+from api import accounts as accounts_api, ai
 from api.errors import install_exception_handlers
 from services.account_service import AccountService
 from services import openai_backend_api as backend_module
@@ -167,6 +167,44 @@ class FreeWebImageTests(unittest.TestCase):
         self.assertEqual(self.remote_checks, ["fixture-web-free", "fixture-web-free"])
         self.assertEqual(self.requests[-1]["http_version"], CurlHttpVersion.V1_1)
 
+    def test_browser_oauth_login_free_account_exposes_and_uses_web_alias(self):
+        self.accounts.delete_accounts(["fixture-web-free"])
+
+        def refresh_web_account(token, *_args, **_kwargs):
+            return self.accounts.update_account(token, {"type": "free", "status": "正常", "quota": 3})
+
+        app = FastAPI()
+        install_exception_handlers(app)
+        app.include_router(accounts_api.create_router())
+        app.include_router(ai.create_router())
+        with (
+            mock.patch.object(accounts_api, "account_service", self.accounts),
+            mock.patch.object(accounts_api.oauth_login_service, "finish", return_value={
+                "access_token": "fixture-oauth-free", "refresh_token": "fixture-refresh", "id_token": "fixture-id",
+            }),
+            mock.patch.object(self.accounts, "fetch_remote_info", side_effect=refresh_web_account),
+            TestClient(app) as client,
+        ):
+            login = client.post("/api/accounts/oauth/finish", headers=HEADERS, json={
+                "session_id": "fixture-session", "callback": "fixture-code",
+            })
+            self.assertEqual(login.status_code, 200, login.text)
+            [account] = login.json()["items"]
+            self.assertEqual(account["type"], "free")
+            self.assertEqual(account["source_type"], "oauth_login")
+            self.assertEqual(account["status"], "正常")
+            response = client.get("/v1/models", headers=HEADERS)
+            self.assertEqual(response.status_code, 200, response.text)
+            ids = {item["id"] for item in response.json()["data"]}
+            self.assertIn(WEB_MODEL, ids)
+            self.assertNotIn("gpt-image-2.5-flare", ids)
+
+            self.enable_fixture_upstream()
+            generated = client.post("/v1/images/generations", headers=HEADERS, json={"model": WEB_MODEL, "prompt": "fixture"})
+            self.assertEqual(generated.status_code, 200, generated.text)
+            self.assertEqual([item["json"]["model"] for item in self.requests], ["gpt-5-3", "gpt-5-3"])
+            self.assertEqual(self.remote_checks, ["fixture-oauth-free"])
+
     def test_free_edit_reuses_legacy_request_and_keeps_all_references(self):
         self.enable_fixture_upstream()
         requests_by_model = []
@@ -228,7 +266,7 @@ class FreeWebImageTests(unittest.TestCase):
 
     def test_account_catalog_and_selection_agree_on_web_sources(self):
         self.enable_fixture_upstream()
-        for source, expected in (("web", True), ("password", True), (None, True), ("codex", False), ("unknown", False)):
+        for source, expected in (("web", True), ("password", True), ("oauth_login", True), (None, True), ("codex", False), ("unknown", False)):
             with self.subTest(source=source):
                 self.accounts.update_account("fixture-web-free", {"source_type": source, "quota": 3, "status": "正常"})
                 self.requests.clear()

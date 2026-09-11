@@ -153,8 +153,8 @@ class AccountService:
         actual = cls._normalize_source_type(account.get("source_type"))
         expected = cls._normalize_source_type(source_type)
         if expected == "web":
-            # 密码登录仍使用 Web 通道；保留存储来源值，不将 Codex 令牌混入。
-            return actual in {"web", "password"}
+            # 密码和内置 OAuth 网页登录都使用 Web 通道；保留来源值，不混入 Codex。
+            return actual in {"web", "password", "oauth_login"}
         return actual == expected
 
     @classmethod

@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/fujunchao/chatgpt2api:0.16.2
+    image: ghcr.io/fujunchao/chatgpt2api:0.16.3
     container_name: chatgpt2api-image25
     restart: unless-stopped
     ports:

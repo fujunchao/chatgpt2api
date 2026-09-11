@@ -17,11 +17,13 @@
 
 ## 快速开始
 
-### v0.16.2：Free 网页图片入口
+### v0.16.3：Free 网页图片入口与 OAuth 修复
 
-新增 `gpt-image-2.5`，在有配额的 Free / 付费网页登录账号上复用现有 `gpt-image-2` 图片请求。界面标注为 **Web 自动**：图片引擎由官网选择，具体版本未知，不是 Flare / Sunburst 选择开关。
+修复 v0.16.2 漏掉 `oauth_login` 来源的问题：通过内置浏览器 OAuth 登录的 Free 账号，现在不会因来源标记而被排除出模型目录和 Web 选号；无需修改已有账号的来源记录。
 
-旧默认值不变；`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 和 `codex-*` 名称仍走原有付费 Codex 路由。用法、账号来源与验证范围见 [Free Web 接入说明](./docs/free-web-image-integration.zh-CN.md)。使用镜像 `ghcr.io/fujunchao/chatgpt2api:0.16.2`；旧 `v0.16.1` 镜像不包含这个 Web 兼容入口。
+`gpt-image-2.5` 在有配额的 Free / 付费网页登录账号上复用现有 `gpt-image-2` 图片请求。界面标注为 **Web 自动**：图片引擎由官网选择，具体版本未知，不是 Flare / Sunburst 选择开关。
+
+旧默认值不变；`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 和 `codex-*` 名称仍走原有付费 Codex 路由。用法、账号来源与验证范围见 [Free Web 接入说明](./docs/free-web-image-integration.zh-CN.md)。使用镜像 `ghcr.io/fujunchao/chatgpt2api:0.16.3`；旧 `v0.16.2` 镜像不包含 OAuth 来源修复。
 
 ### v0.16.1：生产补丁与 GPT Image 2.5
 
@@ -86,7 +88,7 @@ bun run dev
 后续更新新版本：
 
 ```bash
-docker pull ghcr.io/fujunchao/chatgpt2api:0.16.2
+docker pull ghcr.io/fujunchao/chatgpt2api:0.16.3
 docker-compose down
 docker-compose up -d
 
