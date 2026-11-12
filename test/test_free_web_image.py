@@ -91,7 +91,8 @@ class FixtureSession:
         pass
 
 
-class FreeWebImageTests(unittest.TestCase):
+class WebImageFixture(unittest.TestCase):
+    """共用网页 HTTP 测试环境，不继承其它模型的测试用例。"""
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -150,6 +151,7 @@ class FreeWebImageTests(unittest.TestCase):
             message.pop("create_time", None)
         return payload
 
+class FreeWebImageTests(WebImageFixture):
     def test_free_generation_reuses_the_working_legacy_web_request(self):
         self.enable_fixture_upstream()
         requests_by_model = []

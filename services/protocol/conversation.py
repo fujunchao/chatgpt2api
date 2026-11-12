@@ -26,7 +26,8 @@ from utils.helper import (
     split_image_model,
 )
 from utils.image_models import (
-    ImageModelParameterError, is_gpt_image_25_model, is_web_auto_image_model, validate_image_options,
+    ImageModelParameterError, is_gpt_image_25_model, is_web_auto_image_model,
+    is_web_image_26_model, validate_image_options,
 )
 from utils.image_tokens import count_image_content_tokens, sum_token_usages
 from utils.log import logger
@@ -1364,7 +1365,7 @@ def _generate_single_image(
             plan_type, _ = split_image_model(request.model)
             codex_model = is_codex_image_model(request.model)
             source_type = "codex" if codex_model else None
-            if is_web_auto_image_model(request.model):
+            if is_web_auto_image_model(request.model) or is_web_image_26_model(request.model):
                 source_type = "web"
             token = account_service.get_available_access_token(
                 plan_type=plan_type,

@@ -9,7 +9,15 @@ IMAGE_MODEL_PLAN_TYPES = ("plus", "team", "pro")
 CODEX_IMAGE_MODEL = "codex-gpt-image-2"
 # 这是本项目的 Web 兼容入口，不是已验证的官方图片引擎标识。
 WEB_AUTO_IMAGE_MODEL = "gpt-image-2.5"
-WEB_IMAGE_MODELS = frozenset({"gpt-image-2", WEB_AUTO_IMAGE_MODEL})
+LEGACY_WEB_IMAGE_MODELS = frozenset({"gpt-image-2", WEB_AUTO_IMAGE_MODEL})
+# 2.6 通过网页会话显式请求变体；短名的 Sunburst 默认值属于本地约定。
+WEB_IMAGE_26_UPSTREAM_MODELS = {
+    "gpt-image-2.6": "gpt-image-2.6-sunburst",
+    "gpt-image-2.6-sunburst": "gpt-image-2.6-sunburst",
+    "gpt-image-2.6-flare": "gpt-image-2.6-flare",
+}
+WEB_IMAGE_26_MODELS = frozenset(WEB_IMAGE_26_UPSTREAM_MODELS)
+WEB_IMAGE_MODELS = LEGACY_WEB_IMAGE_MODELS | WEB_IMAGE_26_MODELS
 GPT_IMAGE_25_MODELS = frozenset({
     "gpt-image-2.5-flare",
     "gpt-image-2.5-sunburst",
@@ -66,6 +74,11 @@ def is_codex_image_model(model: object) -> bool:
 def is_web_auto_image_model(model: object) -> bool:
     """识别显式的 Web 自动入口，不把它视为已确认的 2.5 引擎。"""
     return split_image_model(model)[1] == WEB_AUTO_IMAGE_MODEL
+
+
+def is_web_image_26_model(model: object) -> bool:
+    """识别网页 2.6 请求名称，不据此声明账号具有该变体权限。"""
+    return split_image_model(model)[1] in WEB_IMAGE_26_MODELS
 
 
 def codex_tool_model(model: object) -> str:

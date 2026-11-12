@@ -24,7 +24,10 @@ from services.account_service import account_service
 from services.config import config
 from services.proxy_service import proxy_settings
 from utils.helper import UpstreamHTTPError, ensure_ok, iter_sse_payloads, new_uuid, split_image_model
-from utils.image_models import CODEX_IMAGE_MODEL, WEB_IMAGE_MODELS, codex_tool_model, validate_image_options
+from utils.image_models import (
+    CODEX_IMAGE_MODEL, WEB_IMAGE_MODELS, WEB_IMAGE_26_UPSTREAM_MODELS,
+    codex_tool_model, validate_image_options,
+)
 from utils.log import logger
 from utils.pow import build_legacy_requirements_token, build_proof_token, parse_pow_resources
 from utils.turnstile import solve_turnstile_token
@@ -563,6 +566,8 @@ class OpenAIBackendAPI:
         _, base_model = split_image_model(model)
         if not base_model:
             return "auto"
+        if base_model in WEB_IMAGE_26_UPSTREAM_MODELS:
+            return WEB_IMAGE_26_UPSTREAM_MODELS[base_model]
         if base_model in WEB_IMAGE_MODELS:
             # Web 兼容入口复用已验证的旧请求；图片引擎由官网决定。
             return "gpt-5-3"
