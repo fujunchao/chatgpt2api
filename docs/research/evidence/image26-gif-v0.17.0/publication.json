@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "verified_at_utc": "2026-11-12T15:11:15.569685+00:00",
+  "image": "ghcr.io/fujunchao/chatgpt2api:0.17.0",
+  "code_commit": "41a1a93e9b547bd90c1ebc4822376573b291b5e7",
+  "manifest_digest": "sha256:e0c8d5c0de352db079c8db4102624907624815f4f9498dbb37ce9df0f2c6cead",
+  "platforms": [
+    {
+      "os": "linux",
+      "architecture": "amd64",
+      "digest": "sha256:8aa350b98c1279dc70bfafdf3cc1e6a7068e8f94ee635c467381f592d137ad7e",
+      "revision": "41a1a93e9b547bd90c1ebc4822376573b291b5e7",
+      "version_label": "0.17.0"
+    },
+    {
+      "os": "linux",
+      "architecture": "arm64",
+      "digest": "sha256:e32787b82f233522c38aaca819c97f5cf2ad01c9ad9fa0cd14b09c8b64d4dff9",
+      "revision": "41a1a93e9b547bd90c1ebc4822376573b291b5e7",
+      "version_label": "0.17.0"
+    }
+  ],
+  "tags": {
+    "0.17.0": "sha256:e0c8d5c0de352db079c8db4102624907624815f4f9498dbb37ce9df0f2c6cead",
+    "v0.17.0": "sha256:e0c8d5c0de352db079c8db4102624907624815f4f9498dbb37ce9df0f2c6cead",
+    "latest": "sha256:e0c8d5c0de352db079c8db4102624907624815f4f9498dbb37ce9df0f2c6cead"
+  },
+  "all_checks_passed": true,
+  "version": "0.17.0",
+  "release_url": "https://github.com/fujunchao/chatgpt2api/releases/tag/v0.17.0",
+  "workflow_run_url": "https://github.com/fujunchao/chatgpt2api/actions/runs/43244005962",
+  "workflow_run_id": 43244005962,
+  "workflow_conclusion": "success",
+  "backend_offline_tests": 232,
+  "frontend_tests": 11,
+  "type_check_passed": true,
+  "production_web_build_passed": true,
+  "real_upstream_acceptance_cases_passed": 4,
+  "standards_review_remaining_findings": 0,
+  "spec_review_remaining_findings": 0
+}

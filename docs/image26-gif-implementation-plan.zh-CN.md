@@ -39,4 +39,4 @@
 - [x] 第一阶段：参数、严格动画验收及原字节存储已贯通。
 - [x] 第二阶段：兼容入口、恢复、格式选择、历史与原动画下载已贯通。
 - [x] 第三阶段：232 项后端隔离回归、11 项前端测试、类型检查及生产构建通过；Free 网页账号四项真实验收均成功，浏览器交互与临时数据清理已完成。
-- [ ] 第四阶段：规范与需求复查均通过，版本和发布资料已就绪；本提交冻结后推送、创建 v0.17.0 Release 并核对多架构镜像。
+- [x] 第四阶段：发布提交 `41a1a93` 已推送，[v0.17.0 Release](https://github.com/fujunchao/chatgpt2api/releases/tag/v0.17.0) 已发布；[镜像流水线](https://github.com/fujunchao/chatgpt2api/actions/runs/43244005962) 成功，amd64 / arm64 与版本、latest 标签均已核对。[发布核对记录](research/evidence/image26-gif-v0.17.0/publication.json)保留索引摘要和提交信息。

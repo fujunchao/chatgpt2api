@@ -48,3 +48,9 @@ bun run build
 验收只复制临时 access token（访问令牌），不复制或刷新 refresh token（刷新令牌）。生产服务没有重启或覆盖；本任务两个隔离目录的临时凭据、日志、scratch 及依赖缓存均已清理，保留脱敏报告和图片。[清理核对记录](evidence/image26-gif-v0.17.0/server-cleanup.json)确认原容器仍为 v0.16.5 且未重启。本机浏览器验收服务也已停止，公开报告不包含账号凭据、邮箱、SSH 地址或签名下载链接。
 
 当前能力和接口示例见 [GIF 接入说明](../image26-gif-guide.zh-CN.md)，上游/fork 依据见 [实施前调研](image26-free-web-gif-2026-11-12.zh-CN.md)。
+
+## 发布核对
+
+正式发布代码提交为 `41a1a93e9b547bd90c1ebc4822376573b291b5e7`，发布标签 `v0.17.0`。[镜像流水线](https://github.com/fujunchao/chatgpt2api/actions/runs/43244005962) 成功；`ghcr.io/fujunchao/chatgpt2api:0.17.0` 同时包含 `linux/amd64` 和 `linux/arm64`，两份镜像的提交标签均匹配发布代码。`0.17.0`、`v0.17.0` 和 `latest` 指向同一索引。
+
+索引摘要为 `sha256:e0c8d5c0de352db079c8db4102624907624815f4f9498dbb37ce9df0f2c6cead`。精确平台摘要、标签和验证时间见 [发布核对记录](evidence/image26-gif-v0.17.0/publication.json)。这项镜像验证不增加上游出图请求，也不改变前文冻结源码验收的证据边界。
