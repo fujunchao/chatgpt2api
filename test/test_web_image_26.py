@@ -147,6 +147,60 @@ class WebImage26Tests(WebImageFixture):
         self.assertEqual(task["usage_source"], "unavailable")
         self.assertEqual(sum(item["url"].endswith("/f/conversation") for item in self.requests), 1)
 
+    def test_receive_failure_after_submission_does_not_send_the_image_again(self):
+        self.enable_fixture_upstream()
+        for failure in (
+            "curl: (56) Recv failure: Connection reset by peer",
+            "curl: (55) Failed sending data: Connection aborted",
+            "curl: (52) Empty reply from server: Remote disconnected",
+        ):
+            with self.subTest(failure=failure):
+                self.requests.clear()
+
+                class ResetSession(FixtureSession):
+                    def post(self, url, **kwargs):
+                        if url.endswith("/f/conversation"):
+                            self.requests.append({"url": url, **kwargs})
+                            raise RuntimeError(failure)
+                        return super().post(url, **kwargs)
+
+                    def get(self, url, **kwargs):
+                        self.requests.append({"url": url, "method": "GET", **kwargs})
+                        if "/backend-api/conversations?" in url:
+                            return FixtureResponse({"items": []})
+                        raise AssertionError(f"未配置的恢复查询：{url}")
+
+                with mock.patch.object(backend_module.requests, "Session", side_effect=lambda **_kwargs: ResetSession(self.requests)):
+                    response = self.client.post("/v1/images/generations", headers=HEADERS, json={
+                        "model": "gpt-image-2.6-flare", "prompt": "fixture",
+                    })
+                self.assertEqual(response.status_code, 502, response.text)
+                self.assertEqual(response.json()["error"]["code"], "image_stream_interrupted")
+                self.assertEqual(sum(item["url"].endswith("/f/conversation") for item in self.requests), 1)
+
+    def test_tls_handshake_failure_before_submission_can_retry_safely(self):
+        self.enable_fixture_upstream()
+        failed = False
+
+        class HandshakeSession(FixtureSession):
+            def post(self, url, **kwargs):
+                nonlocal failed
+                if url.endswith("/f/conversation") and not failed:
+                    failed = True
+                    self.requests.append({"url": url, "failed_before_submission": True, **kwargs})
+                    raise RuntimeError("curl: (35) TLS connect error: Connection reset by peer")
+                return super().post(url, **kwargs)
+
+        with mock.patch.object(backend_module.requests, "Session", side_effect=lambda **_kwargs: HandshakeSession(self.requests)):
+            response = self.client.post("/v1/images/generations", headers=HEADERS, json={
+                "model": "gpt-image-2.6-flare", "prompt": "fixture",
+            })
+        self.assertEqual(response.status_code, 200, response.text)
+        submissions = [item for item in self.requests if item["url"].endswith("/f/conversation")]
+        self.assertEqual(len(submissions), 2)
+        self.assertTrue(submissions[0]["failed_before_submission"])
+        self.assertEqual(len(response.json()["data"]), 1)
+
     def test_generation_sends_the_selected_web_variant_in_both_requests(self):
         self.enable_fixture_upstream()
         for requested, expected in (

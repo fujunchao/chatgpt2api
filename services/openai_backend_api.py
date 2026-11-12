@@ -2681,7 +2681,19 @@ class OpenAIBackendAPI:
         except Exception as exc:
             if isinstance(exc, UpstreamHTTPError):
                 raise
-            if getattr(exc, "code", None) in {28, 92} or re.search(r"curl:\s*\((?:28|92)\)", str(exc), re.I):
+            error_text = str(exc).lower()
+            curl_code = getattr(exc, "code", None)
+            code_match = re.search(r"curl:\s*\((\d+)\)", error_text)
+            if code_match:
+                curl_code = int(code_match.group(1))
+            # 接收/发送失败不能证明请求未提交；只按本次消息 ID 恢复，禁止重投。
+            # curl 35 是提交前的 TLS 握手错误，保留其既有安全重试。
+            if curl_code in {18, 28, 52, 55, 56, 92} or (
+                curl_code != 35 and any(marker in error_text for marker in (
+                    "connection reset by peer", "connection aborted", "remote disconnected",
+                    "recv failure", "failed sending data", "broken pipe", "read timed out",
+                ))
+            ):
                 raise ImageStreamInterruptedError(str(exc), message_id, started_at) from exc
             raise
         finally:
