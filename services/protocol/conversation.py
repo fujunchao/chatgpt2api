@@ -11,7 +11,7 @@ from typing import Any, Iterable, Iterator
 
 import tiktoken
 
-from services.account_service import account_service
+from services.account_service import account_service, image_recovery_account_key
 from services.config import config
 from services.image_storage_service import image_storage_service
 from services.openai_backend_api import (
@@ -170,7 +170,7 @@ def encode_images(images: Iterable[tuple[bytes, str, str]]) -> list[str]:
     return [base64.b64encode(data).decode("ascii") for data, _, _ in images if data]
 
 
-def _encode_generated_image(payload: bytes, model: str) -> str:
+def encode_generated_image(payload: bytes, model: str) -> str:
     if is_web_image_26_model(model):
         info = inspect_image(payload, verify=True)
         if info is None or not info.supported_static:
@@ -1043,7 +1043,7 @@ def stream_image_outputs(
         if request.progress_callback:
             request.progress_callback("receiving_image")
         image_items = [
-            {"b64_json": _encode_generated_image(image_data, request.model)}
+            {"b64_json": encode_generated_image(image_data, request.model)}
             for image_data in backend.download_image_bytes(image_urls)
         ]
         data = format_image_result(
@@ -1141,7 +1141,7 @@ def stream_image_outputs(
                     if request.progress_callback:
                         request.progress_callback("receiving_image")
                     image_items = [
-                        {"b64_json": _encode_generated_image(image_data, request.model)}
+                        {"b64_json": encode_generated_image(image_data, request.model)}
                         for image_data in backend.download_image_bytes(image_urls)
                     ]
                     data = format_image_result(
@@ -1254,7 +1254,7 @@ def stream_image_outputs(
                 if request.progress_callback:
                     request.progress_callback("receiving_image")
                 image_items = [
-                    {"b64_json": _encode_generated_image(image_data, request.model)}
+                    {"b64_json": encode_generated_image(image_data, request.model)}
                     for image_data in backend.download_image_bytes(image_urls)
                 ]
                 data = format_image_result(
@@ -1369,10 +1369,48 @@ def _is_web_model_permission_rejection(status: int, detail: dict[str, Any]) -> b
     )
 
 
+class _WebImageModelPermissionBudget:
+    """同一请求共享型号拒绝次数，在途检查也占槽位以限制并发试用。"""
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._inflight = 0
+        self._rejections = 0
+        self._rejected_tokens: set[str] = set()
+        self.last_error: ImageGenerationError | None = None
+
+    def acquire(self) -> set[str]:
+        with self._condition:
+            while self._inflight + self._rejections >= 3:
+                if self._rejections >= 3:
+                    assert self.last_error is not None
+                    raise self.last_error
+                self._condition.wait()
+            self._inflight += 1
+            return set(self._rejected_tokens)
+
+    def release(self) -> None:
+        with self._condition:
+            self._inflight -= 1
+            self._condition.notify_all()
+
+    def is_rejected(self, token: str) -> bool:
+        with self._condition:
+            return token in self._rejected_tokens
+
+    def reject(self, token: str, error: ImageGenerationError) -> bool:
+        with self._condition:
+            self._rejected_tokens.add(token)
+            self._rejections += 1
+            self.last_error = error
+            return self._rejections < 3
+
+
 def _generate_single_image(
         request: ConversationRequest,
         index: int,
         total: int,
+        permission_budget: _WebImageModelPermissionBudget | None = None,
 ) -> list[ImageOutput]:
     """为单张图片执行生成逻辑（含重试），返回结果列表。
 
@@ -1393,10 +1431,11 @@ def _generate_single_image(
     conn_timeout_retry_count = 0
     poll_timeout_retry_count = 0
     account_email = ""
-    rejected_web_tokens: set[str] = set()
-    last_web_model_error: ImageGenerationError | None = None
+    if is_web_image_26_model(request.model) and permission_budget is None:
+        permission_budget = _WebImageModelPermissionBudget()
 
     while True:
+        rejected_web_tokens = permission_budget.acquire() if permission_budget is not None else set()
         try:
             if request.progress_callback:
                 request.progress_callback("getting_account")
@@ -1411,8 +1450,13 @@ def _generate_single_image(
                 plan_types=("plus", "team", "pro") if codex_model and not plan_type else None,
                 **({"excluded_tokens": rejected_web_tokens} if rejected_web_tokens else {}),
             )
-        except RuntimeError as exc:
+        except Exception as exc:
+            if permission_budget is not None:
+                permission_budget.release()
+            if not isinstance(exc, RuntimeError):
+                raise
             message = str(exc) or "image generation failed"
+            last_web_model_error = permission_budget.last_error if permission_budget is not None else None
             if last_web_model_error is not None and "image quota" in message.lower():
                 raise last_web_model_error from exc
             if "image quota" in message.lower():
@@ -1425,17 +1469,21 @@ def _generate_single_image(
         emitted_for_token = False
         returned_message = False
         returned_result = False
-        account = account_service.get_account(token) or {}
-        account_email = str(account.get("email") or "").strip()
-        logger.debug({
-            "event": "image_account_lookup",
-            "token_prefix": token[:12] + "..." if len(token) > 12 else token,
-            "account_email": account_email,
-            "account_found": bool(account),
-            "index": index,
-        })
         backend = None
         try:
+            # 选号期间另一张图片可能已拒绝该账号，发送前再检查共享排除集合。
+            if permission_budget is not None and permission_budget.is_rejected(token):
+                account_service.release_image_slot(token)
+                continue
+            account = account_service.get_account(token) or {}
+            account_email = str(account.get("email") or "").strip()
+            logger.debug({
+                "event": "image_account_lookup",
+                "token_prefix": token[:12] + "..." if len(token) > 12 else token,
+                "account_email": account_email,
+                "account_found": bool(account),
+                "index": index,
+            })
             backend = OpenAIBackendAPI(access_token=token)
             if request.progress_callback:
                 backend.progress_callback = request.progress_callback
@@ -1477,6 +1525,8 @@ def _generate_single_image(
             return outputs
         except ImagePollTimeoutError as exc:
             account_service.mark_image_result(token, False)
+            if getattr(exc, "conversation_id", ""):
+                setattr(exc, "recovery_account_key", image_recovery_account_key(token))
             if account_email:
                 setattr(exc, "account_email", account_email)
             # 轮询超时：换账号重试
@@ -1599,9 +1649,8 @@ def _generate_single_image(
                     and _can_retry_image_request(backend, emitted_for_token)
                     and _is_web_model_permission_rejection(exc.status_code, detail)
                 ):
-                    rejected_web_tokens.add(token)
-                    last_web_model_error = model_error
-                    if len(rejected_web_tokens) < 3:
+                    assert permission_budget is not None
+                    if permission_budget.reject(token, model_error):
                         continue
                 raise model_error from exc
             # TLS/SSL 连接错误：自动重试
@@ -1636,8 +1685,12 @@ def _generate_single_image(
                     continue
             raise ImageGenerationError(image_stream_error_message(last_error), account_email=account_email, conversation_id="") from exc
         finally:
-            if backend is not None:
-                backend.close()
+            try:
+                if backend is not None:
+                    backend.close()
+            finally:
+                if permission_budget is not None:
+                    permission_budget.release()
 
 
 def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[ImageOutput]:
@@ -1648,9 +1701,10 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
             status_code=400, error_type="invalid_request_error", code="model_not_found", param="model",
         )
 
+    permission_budget = _WebImageModelPermissionBudget() if is_web_image_26_model(request.model) else None
     if request.n <= 1:
         # 单张图片，直接执行（无需线程池开销）
-        outputs = _generate_single_image(request, 1, 1)
+        outputs = _generate_single_image(request, 1, 1, permission_budget)
         for output in outputs:
             yield output
         return
@@ -1663,7 +1717,7 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
             "model": request.model,
         })
         for index in range(1, request.n + 1):
-            outputs = _generate_single_image(request, index, request.n)
+            outputs = _generate_single_image(request, index, request.n, permission_budget)
             for output in outputs:
                 yield output
         return
@@ -1679,7 +1733,7 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
     errors: dict[int, Exception] = {}
     with ThreadPoolExecutor(max_workers=request.n) as executor:
         for index in range(1, request.n + 1):
-            future = executor.submit(_generate_single_image, request, index, request.n)
+            future = executor.submit(_generate_single_image, request, index, request.n, permission_budget)
             futures[future] = index
 
         # 按完成顺序收集结果

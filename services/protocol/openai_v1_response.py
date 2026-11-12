@@ -477,7 +477,9 @@ def response_image_model(body: dict[str, Any], tool: dict[str, Any]) -> str:
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
     if has_response_image_generation_tool(body):
         tool = response_image_tool(body)
-        validate_image_request_parameters(response_image_model(body, tool), tool)
+        image_model = response_image_model(body, tool)
+        validate_image_request_parameters(image_model, body)
+        validate_image_request_parameters(image_model, tool)
     events = response_events(body)
     if body.get("stream"):
         return events

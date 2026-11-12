@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from services.account_service import account_service
 from services.config import DATA_DIR, config
 from services.content_filter import request_text
 from services.log_service import LOG_TYPE_CALL, log_service
@@ -295,10 +296,12 @@ class ImageTaskService:
             error_message = str(exc) or "image task failed"
             account_email = _clean(getattr(exc, "account_email", ""))
             conversation_id = _clean(getattr(exc, "conversation_id", ""))
+            recovery_account_key = _clean(getattr(exc, "recovery_account_key", ""))
             duration_ms = int((time.time() - started) * 1000)
             self._update_task(key, status=TASK_STATUS_ERROR, error=error_message, data=[],
                               duration_ms=duration_ms,
-                              **({"conversation_id": conversation_id} if conversation_id else {}))
+                              **({"conversation_id": conversation_id} if conversation_id else {}),
+                              **({"recovery_account_key": recovery_account_key} if recovery_account_key else {}))
             self._log_call(
                 identity,
                 mode,
@@ -492,9 +495,17 @@ class ImageTaskService:
         backend = None
         try:
             from services.openai_backend_api import OpenAIBackendAPI
-            from services.protocol.conversation import format_image_result
+            from services.protocol.conversation import (
+                ImageOutput, collect_image_outputs, encode_generated_image, format_image_result,
+            )
 
-            backend = OpenAIBackendAPI(proxy_url=config.proxy_url or None)
+            with self._lock:
+                task = self._tasks.get(key) or {}
+                recovery_key = _clean(task.get("recovery_account_key"))
+            token = account_service.get_image_recovery_access_token(recovery_key)
+            if not token:
+                raise RuntimeError("无法定位原网页账号，不能继续读取该会话；未重新提交图片请求。")
+            backend = OpenAIBackendAPI(access_token=token)
             file_ids, sediment_ids = backend._poll_image_results(
                 conversation_id,
                 extra_timeout_secs,
@@ -511,14 +522,9 @@ class ImageTaskService:
                 raise RuntimeError("图片 URL 解析失败")
 
             image_items = [
-                {"b64_json": __import__("base64").b64encode(image_data).decode("ascii")}
+                {"b64_json": encode_generated_image(image_data, model)}
                 for image_data in backend.download_image_bytes(image_urls)
             ]
-            # 获取 task 的原始 prompt（从 _public_task 的 mode 判断）
-            with self._lock:
-                task = self._tasks.get(key)
-                quality = _clean(task.get("quality"), "auto") if task else "auto"
-                size = _clean(task.get("size")) if task else None
             data = format_image_result(
                 image_items,
                 "",  # prompt 已不重要，结果已经拿到了
@@ -526,7 +532,11 @@ class ImageTaskService:
                 "",
                 int(time.time()),
             )["data"]
-            self._update_task(key, status=TASK_STATUS_SUCCESS, data=data, error="", duration_ms=int((time.time() - started) * 1000))
+            result = collect_image_outputs([ImageOutput(kind="result", model=model, index=1, total=1, data=data)])
+            self._update_task(
+                key, status=TASK_STATUS_SUCCESS, data=result["data"], usage=result.get("usage"),
+                usage_source=result.get("usage_source", ""), error="", duration_ms=int((time.time() - started) * 1000),
+            )
             self._log_call(
                 identity,
                 mode,

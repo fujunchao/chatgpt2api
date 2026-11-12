@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import secrets
 import time
@@ -19,6 +20,11 @@ from services.log_service import (
 )
 from services.storage.base import StorageBackend
 from utils.helper import anonymize_token
+
+
+def image_recovery_account_key(access_token: str) -> str:
+    """用不可逆摘要定位原账号，任务记录不保存网页凭据。"""
+    return hashlib.sha256(access_token.encode("utf-8")).hexdigest()
 
 
 class AccountService:
@@ -1054,6 +1060,20 @@ class AccountService:
             access_token = self._resolve_access_token_locked(access_token)
             account = self._accounts.get(access_token)
             return dict(account) if account else None
+
+    def get_image_recovery_access_token(self, recovery_key: str) -> str:
+        """恢复只使用原网页账号；同时支持本进程已记录的令牌轮换。"""
+        if not recovery_key:
+            return ""
+        with self._lock:
+            for token in (*self._accounts, *self._token_aliases):
+                if image_recovery_account_key(token) != recovery_key:
+                    continue
+                resolved = self._resolve_access_token_locked(token)
+                account = self._accounts.get(resolved)
+                if account and self._account_matches_source_type(account, "web"):
+                    return resolved
+        return ""
 
     def list_accounts(self) -> list[dict]:
         """返回所有账号的副本，并为每个账号附加当前图片在途数 image_inflight。

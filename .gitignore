@@ -34,6 +34,9 @@ loginwithpassword_*/
 logwithemailverifycode_*/
 test_batch_output/
 
+# 调研/扫描的中间产物（fork 枚举、diff 取证）不随发布上传。
+.scratch/
+
 # 本地生产覆盖包与含机器路径的研究笔记不随公开发布上传。
 C2A-Production-Patches-*.zip
 docs/project-understanding.zh-CN.md

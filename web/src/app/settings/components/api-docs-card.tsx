@@ -215,7 +215,7 @@ const docs: ApiDoc[] = [
   },
 ];
 
-const usableModels = ["gpt-image-2", "codex-gpt-image-2", "auto", "gpt-5", "gpt-5-1", "gpt-5-2", "gpt-5-3", "gpt-5-3-mini", "gpt-5-mini"];
+const usableModels = ["gpt-image-2", "gpt-image-2.5", "gpt-image-2.6", "gpt-image-2.6-sunburst", "gpt-image-2.6-flare", "codex-gpt-image-2", "auto", "gpt-5", "gpt-5-1", "gpt-5-2", "gpt-5-3", "gpt-5-3-mini", "gpt-5-mini"];
 
 function ParamTable({ rows }: { rows: ParamRow[] }) {
   return (
@@ -297,6 +297,9 @@ export function ApiDocsCard() {
               <span key={model} className="rounded-md border border-stone-200 bg-white px-2 py-1 font-mono text-xs text-stone-700">{model}</span>
             ))}
           </div>
+          <p className="text-xs text-stone-500">
+            Image 2.6 使用网页账号，短名 gpt-image-2.6 固定请求 Sunburst。尺寸和质量作为网页提示，实际型号权限与输出以上游为准；当前支持静态 PNG、JPEG、WebP。
+          </p>
         </div>
 
         <div className="space-y-3">

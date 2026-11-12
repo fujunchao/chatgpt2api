@@ -11,12 +11,122 @@ from unittest import mock
 from PIL import Image
 
 from api import image_tasks as image_tasks_api
-from services import openai_backend_api as backend_module
+from services import image_task_service as image_task_module, openai_backend_api as backend_module
+from services.config import config
 from services.image_task_service import ImageTaskService
 from test.test_free_web_image import HEADERS, FixtureResponse, FixtureSession, WebImageFixture
 
 
 class WebImage26Tests(WebImageFixture):
+    def enable_resume_poll_fixture(self):
+        self.enable_fixture_upstream()
+
+        class ResumeSession(FixtureSession):
+            def get(self, url, **kwargs):
+                self.requests.append({"url": url, "method": "GET", **kwargs})
+                if "/backend-api/tasks" in url:
+                    return FixtureResponse({"tasks": []})
+                if url.endswith("/backend-api/conversation/fixture-conversation"):
+                    return FixtureResponse({"mapping": {"fixture-output": {"message": {
+                        "author": {"role": "tool", "name": "image_gen"},
+                        "content": {"content_type": "multimodal_text", "parts": [{
+                            "content_type": "image_asset_pointer",
+                            "asset_pointer": "file-service://file_00000000111111111111111111111111",
+                        }]},
+                    }}}})
+                raise AssertionError(f"未配置的恢复请求：{url}")
+
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        service = ImageTaskService(Path(directory.name) / "tasks.json")
+        for patcher in (
+            mock.patch.object(image_tasks_api, "image_task_service", service),
+            mock.patch.object(image_task_module, "account_service", self.accounts),
+            mock.patch.object(backend_module.requests, "Session", side_effect=lambda **_kwargs: ResumeSession(self.requests)),
+            mock.patch.dict(config.data, {"image_poll_initial_wait_secs": 0, "image_check_before_hit_enabled": False}),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client.app.include_router(image_tasks_api.create_router())
+
+    def wait_for_http_task(self, task_id):
+        for _ in range(100):
+            [task] = self.client.get("/api/image-tasks", headers=HEADERS, params={"ids": task_id}).json()["items"]
+            if task["status"] not in {"pending", "queued", "running"}:
+                return task
+            time.sleep(0.02)
+        self.fail(f"任务未在测试时限内完成：{task}")
+
+    def test_resume_poll_uses_original_web_account_and_marks_unknown_usage(self):
+        self.enable_resume_poll_fixture()
+        timeout = backend_module.ImagePollTimeoutError("ChatGPT 生图超时")
+        timeout.conversation_id = "fixture-conversation"
+        with mock.patch.object(backend_module.OpenAIBackendAPI, "download_image_bytes", side_effect=[timeout, [self.image]]):
+            created = self.client.post("/api/image-tasks/generations", headers=HEADERS, json={
+                "client_task_id": "web26-resume", "model": "gpt-image-2.6-flare", "prompt": "fixture",
+            })
+            self.assertEqual(created.status_code, 200, created.text)
+            failed = self.wait_for_http_task("web26-resume")
+            self.assertEqual(failed["status"], "error", failed)
+            self.assertEqual(failed["conversation_id"], "fixture-conversation")
+            resumed = self.client.post("/api/image-tasks/web26-resume/resume-poll", headers=HEADERS, json={"extra_timeout_secs": 5})
+            self.assertEqual(resumed.status_code, 200, resumed.text)
+            task = self.wait_for_http_task("web26-resume")
+        self.assertEqual(task["status"], "success", task)
+        self.assertEqual(task["model"], "gpt-image-2.6-flare")
+        self.assertEqual(task["usage_source"], "unavailable")
+        self.assertNotIn("usage", task)
+        self.assertEqual(base64.b64decode(task["data"][0]["b64_json"]), self.image)
+        self.assertEqual(sum(item["url"].endswith("/f/conversation") for item in self.requests), 1)
+        polls = [item for item in self.requests if item["url"].endswith("/backend-api/conversation/fixture-conversation")]
+        self.assertTrue(polls)
+        self.assertTrue(all(item["headers"]["Authorization"] == "Bearer fixture-web-free" for item in polls))
+
+    def test_resume_poll_rejects_unsupported_formats_without_resubmitting(self):
+        self.enable_resume_poll_fixture()
+        stream = BytesIO()
+        Image.new("RGB", (8, 8), "red").save(
+            stream, format="GIF", save_all=True, append_images=[Image.new("RGB", (8, 8), "blue")],
+        )
+        for index, payload in enumerate((b'<svg xmlns="http://www.w3.org/2000/svg"></svg>', stream.getvalue())):
+            with self.subTest(index=index):
+                self.requests.clear()
+                timeout = backend_module.ImagePollTimeoutError("ChatGPT 生图超时")
+                timeout.conversation_id = "fixture-conversation"
+                task_id = f"web26-resume-format-{index}"
+                with mock.patch.object(backend_module.OpenAIBackendAPI, "download_image_bytes", side_effect=[timeout, [payload]]):
+                    self.client.post("/api/image-tasks/generations", headers=HEADERS, json={
+                        "client_task_id": task_id, "model": "gpt-image-2.6-sunburst", "prompt": "fixture",
+                    })
+                    self.assertEqual(self.wait_for_http_task(task_id)["status"], "error")
+                    resumed = self.client.post(f"/api/image-tasks/{task_id}/resume-poll", headers=HEADERS, json={"extra_timeout_secs": 5})
+                    self.assertEqual(resumed.status_code, 200, resumed.text)
+                    task = self.wait_for_http_task(task_id)
+                self.assertEqual(task["status"], "error", task)
+                self.assertIn("静态 PNG/JPEG/WebP", task["error"])
+                self.assertEqual(task["data"], [])
+                self.assertEqual(sum(item["url"].endswith("/f/conversation") for item in self.requests), 1)
+
+    def test_resume_poll_keeps_original_account_when_its_source_changes(self):
+        self.enable_resume_poll_fixture()
+        timeout = backend_module.ImagePollTimeoutError("ChatGPT 生图超时")
+        timeout.conversation_id = "fixture-conversation"
+        with mock.patch.object(backend_module.OpenAIBackendAPI, "download_image_bytes", side_effect=timeout):
+            self.client.post("/api/image-tasks/generations", headers=HEADERS, json={
+                "client_task_id": "web26-resume-source", "model": "gpt-image-2.6-flare", "prompt": "fixture",
+            })
+            self.assertEqual(self.wait_for_http_task("web26-resume-source")["status"], "error")
+        self.accounts.update_account("fixture-web-free", {"source_type": "codex", "type": "Plus"})
+        self.accounts.add_account_items([
+            {"access_token": "fixture-another-web", "source_type": "web", "type": "free", "status": "正常", "quota": 3},
+        ])
+        self.requests.clear()
+        self.client.post("/api/image-tasks/web26-resume-source/resume-poll", headers=HEADERS, json={"extra_timeout_secs": 5})
+        task = self.wait_for_http_task("web26-resume-source")
+        self.assertEqual(task["status"], "error", task)
+        self.assertIn("原网页账号", task["error"])
+        self.assertEqual(self.requests, [])
+
     def test_generation_sends_the_selected_web_variant_in_both_requests(self):
         self.enable_fixture_upstream()
         for requested, expected in (
@@ -205,6 +315,23 @@ class WebImage26Tests(WebImageFixture):
         self.assertEqual(response.json()["detail"]["error"]["param"], "complexity")
         self.assertEqual(self.requests, [])
 
+    def test_responses_rejects_top_level_native_controls_before_sending_headers(self):
+        self.enable_fixture_upstream()
+        for model, tool in (
+            ("gpt-image-2.6-flare", {"type": "image_generation"}),
+            ("gpt-5", {"type": "image_generation", "model": "gpt-image-2.6-sunburst"}),
+        ):
+            for stream in (False, True):
+                with self.subTest(model=model, stream=stream):
+                    self.requests.clear()
+                    response = self.client.post("/v1/responses", headers=HEADERS, json={
+                        "model": model, "input": "fixture", "tools": [tool],
+                        "stream": stream, "output_format": "gif",
+                    })
+                    self.assertEqual(response.status_code, 400, response.text)
+                    self.assertEqual(response.json()["error"]["param"], "output_format")
+                    self.assertEqual(self.requests, [])
+
     def test_model_permission_error_is_preserved_and_legacy_web_still_works(self):
         self.enable_fixture_upstream()
 
@@ -360,3 +487,49 @@ class WebImage26Tests(WebImageFixture):
         self.assertEqual(len(self.requests), 3)
         self.assertEqual(len({item["headers"]["Authorization"] for item in self.requests}), 3)
         self.assertTrue(all(item["json"]["model"] == "gpt-image-2.6-flare" for item in self.requests))
+
+    def test_multi_image_permission_rotation_is_bounded_for_the_whole_request(self):
+        self.enable_fixture_upstream()
+        self.accounts.add_account_items([
+            {"access_token": f"fixture-web-{index}", "source_type": "web", "type": "free", "status": "正常", "quota": 8}
+            for index in range(4)
+        ])
+
+        class UnavailableSession(FixtureSession):
+            def post(self, url, **kwargs):
+                self.requests.append({"url": url, **kwargs})
+                time.sleep(0.02)
+                denied = FixtureResponse({"error": {
+                    "message": "Model access unavailable", "type": "permission_error",
+                    "code": "model_not_available", "param": "model",
+                }})
+                denied.status_code = 403
+                return denied
+
+        for parallel in (False, True):
+            with (
+                self.subTest(parallel=parallel),
+                mock.patch.dict(config.data, {"image_parallel_generation": parallel}),
+                mock.patch.object(backend_module.requests, "Session", side_effect=lambda **_kwargs: UnavailableSession(self.requests)),
+            ):
+                self.requests.clear()
+                response = self.client.post("/v1/images/generations", headers=HEADERS, json={
+                    "model": "gpt-image-2.6-flare", "prompt": "fixture", "n": 4,
+                })
+                self.assertEqual(response.status_code, 403, response.text)
+                self.assertEqual(response.json()["error"]["code"], "model_not_available")
+                self.assertEqual(len(self.requests), 3)
+                self.assertEqual(len({item["headers"]["Authorization"] for item in self.requests}), 3)
+                self.assertTrue(all(item["json"]["model"] == "gpt-image-2.6-flare" for item in self.requests))
+
+    def test_successful_multi_image_generation_keeps_all_four_results(self):
+        self.enable_fixture_upstream()
+        self.accounts.update_account("fixture-web-free", {"quota": 20})
+        with mock.patch.dict(config.data, {"image_parallel_generation": True}):
+            response = self.client.post("/v1/images/generations", headers=HEADERS, json={
+                "model": "gpt-image-2.6-sunburst", "prompt": "fixture", "n": 4,
+            })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(len(response.json()["data"]), 4)
+        self.assertEqual(response.json()["usage_source"], "unavailable")
+        self.assertEqual(sum(item["url"].endswith("/f/conversation") for item in self.requests), 4)
