@@ -48,6 +48,7 @@ class WebImage26Tests(WebImageFixture):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.client.app.include_router(image_tasks_api.create_router())
+        return Path(directory.name) / "tasks.json"
 
     def wait_for_http_task(self, task_id):
         for _ in range(100):
@@ -126,6 +127,25 @@ class WebImage26Tests(WebImageFixture):
         self.assertEqual(task["status"], "error", task)
         self.assertIn("原网页账号", task["error"])
         self.assertEqual(self.requests, [])
+
+    def test_resume_poll_after_reload_preserves_the_original_conversation(self):
+        task_path = self.enable_resume_poll_fixture()
+        timeout = backend_module.ImagePollTimeoutError("ChatGPT 生图超时")
+        timeout.conversation_id = "fixture-conversation"
+        with mock.patch.object(backend_module.OpenAIBackendAPI, "download_image_bytes", side_effect=[timeout, [self.image]]):
+            self.client.post("/api/image-tasks/generations", headers=HEADERS, json={
+                "client_task_id": "web26-resume-reload", "model": "gpt-image-2.6-flare", "prompt": "fixture",
+            })
+            self.assertEqual(self.wait_for_http_task("web26-resume-reload")["status"], "error")
+            with mock.patch.object(image_tasks_api, "image_task_service", ImageTaskService(task_path)):
+                resumed = self.client.post("/api/image-tasks/web26-resume-reload/resume-poll", headers=HEADERS, json={"extra_timeout_secs": 5})
+                self.assertEqual(resumed.status_code, 200, resumed.text)
+                task = self.wait_for_http_task("web26-resume-reload")
+        self.assertEqual(task["status"], "success", task)
+        self.assertEqual(task["model"], "gpt-image-2.6-flare")
+        self.assertEqual(task["conversation_id"], "fixture-conversation")
+        self.assertEqual(task["usage_source"], "unavailable")
+        self.assertEqual(sum(item["url"].endswith("/f/conversation") for item in self.requests), 1)
 
     def test_generation_sends_the_selected_web_variant_in_both_requests(self):
         self.enable_fixture_upstream()

@@ -408,6 +408,10 @@ class ImageTaskService:
                 task["usage"] = usage
             if item.get("usage_source") in {"upstream", "estimated", "unavailable"}:
                 task["usage_source"] = item["usage_source"]
+            for name in ("conversation_id", "recovery_account_key"):
+                value = _clean(item.get(name))
+                if value:
+                    task[name] = value
             error = _clean(item.get("error"))
             if error:
                 task["error"] = error
