@@ -16,6 +16,7 @@ from services.protocol.conversation import (
     encode_images,
     normalize_messages,
     stream_image_outputs_with_pool,
+    validate_image_request_parameters,
     stream_text_deltas,
     text_backend,
 )
@@ -441,9 +442,7 @@ def response_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
     tool = response_image_tool(body)
     requested_model = str(body.get("model") or "").strip()
     # 顶层是对话模型；工具中的 model 才选择图片模型，同时兼容旧的顶层图片别名。
-    image_model = str(tool.get("model") or "").strip() or (
-        requested_model if is_supported_image_model(requested_model) else "gpt-image-2"
-    )
+    image_model = response_image_model(body, tool)
     if not is_supported_image_model(image_model):
         raise HTTPException(status_code=400, detail={"error": "unsupported image_generation tool model"})
     model = requested_model or image_model
@@ -467,7 +466,18 @@ def response_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
     )
 
 
+def response_image_model(body: dict[str, Any], tool: dict[str, Any]) -> str:
+    """统一预检和实际调用的图片模型选择，保持顶层文本模型的回显。"""
+    requested = str(body.get("model") or "").strip()
+    return str(tool.get("model") or "").strip() or (
+        requested if is_supported_image_model(requested) else "gpt-image-2"
+    )
+
+
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
+    if has_response_image_generation_tool(body):
+        tool = response_image_tool(body)
+        validate_image_request_parameters(response_image_model(body, tool), tool)
     events = response_events(body)
     if body.get("stream"):
         return events

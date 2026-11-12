@@ -27,9 +27,10 @@ from utils.helper import (
 )
 from utils.image_models import (
     ImageModelParameterError, is_gpt_image_25_model, is_web_auto_image_model,
-    is_web_image_26_model, validate_image_options,
+    is_web_image_26_model, validate_image_options, validate_web_image_26_request_options,
 )
 from utils.image_tokens import count_image_content_tokens, sum_token_usages
+from utils.image_format import inspect_image
 from utils.log import logger
 
 
@@ -64,6 +65,20 @@ class ImageGenerationError(Exception):
         if self.account_email:
             error_dict["error"]["account_email"] = self.account_email
         return error_dict
+
+
+def validate_image_request_parameters(model: str, options: dict[str, Any]) -> None:
+    """统一图片 HTTP、工具和任务入口的网页原生参数校验。"""
+    try:
+        validate_web_image_26_request_options(model, options)
+        if is_web_image_26_model(model):
+            validate_image_options(model, options.get("size"), options.get("quality") or "auto")
+    except ImageModelParameterError as exc:
+        raise ImageGenerationError(
+            str(exc), status_code=400, error_type="invalid_request_error",
+            code="invalid_parameter" if exc.param in {"size", "quality"} else "unsupported_parameter",
+            param=exc.param,
+        ) from exc
 
 
 def public_image_error_message(message: str) -> str:
@@ -153,6 +168,17 @@ def is_model_text_reply_instead_of_image(message: str) -> bool:
 
 def encode_images(images: Iterable[tuple[bytes, str, str]]) -> list[str]:
     return [base64.b64encode(data).decode("ascii") for data, _, _ in images if data]
+
+
+def _encode_generated_image(payload: bytes, model: str) -> str:
+    if is_web_image_26_model(model):
+        info = inspect_image(payload, verify=True)
+        if info is None or not info.supported_static:
+            raise ImageGenerationError(
+                "网页 Image 2.6 返回的格式尚不支持；当前只接收静态 PNG/JPEG/WebP",
+                code="unsupported_image_format",
+            )
+    return base64.b64encode(payload).decode("ascii")
 
 
 def save_image_bytes(image_data: bytes, base_url: str | None = None) -> str:
@@ -355,7 +381,7 @@ class ImageOutput:
     def __post_init__(self) -> None:
         # 新 Web 入口的实际图片引擎不透明，流式和汇总结果都不能伪装成已知用量。
         if (
-            self.kind == "result" and is_web_auto_image_model(self.model)
+            self.kind == "result" and (is_web_auto_image_model(self.model) or is_web_image_26_model(self.model))
             and self.usage is None and not self.usage_source
         ):
             self.usage_source = "unavailable"
@@ -1017,7 +1043,7 @@ def stream_image_outputs(
         if request.progress_callback:
             request.progress_callback("receiving_image")
         image_items = [
-            {"b64_json": base64.b64encode(image_data).decode("ascii")}
+            {"b64_json": _encode_generated_image(image_data, request.model)}
             for image_data in backend.download_image_bytes(image_urls)
         ]
         data = format_image_result(
@@ -1115,7 +1141,7 @@ def stream_image_outputs(
                     if request.progress_callback:
                         request.progress_callback("receiving_image")
                     image_items = [
-                        {"b64_json": base64.b64encode(image_data).decode("ascii")}
+                        {"b64_json": _encode_generated_image(image_data, request.model)}
                         for image_data in backend.download_image_bytes(image_urls)
                     ]
                     data = format_image_result(
@@ -1228,7 +1254,7 @@ def stream_image_outputs(
                 if request.progress_callback:
                     request.progress_callback("receiving_image")
                 image_items = [
-                    {"b64_json": base64.b64encode(image_data).decode("ascii")}
+                    {"b64_json": _encode_generated_image(image_data, request.model)}
                     for image_data in backend.download_image_bytes(image_urls)
                 ]
                 data = format_image_result(
@@ -1333,6 +1359,16 @@ def _can_retry_image_request(backend: OpenAIBackendAPI | None, emitted: bool) ->
     return not emitted and getattr(backend, "image_request_accepted", False) is not True
 
 
+def _is_web_model_permission_rejection(status: int, detail: dict[str, Any]) -> bool:
+    """只对确定的型号拒绝有限换号；通用 403/认证/清障错误不能按型号处理。"""
+    return status in {400, 403, 404} and (
+        detail.get("param") == "model"
+        or isinstance(detail.get("code"), str) and detail["code"] in {
+            "model_not_available", "model_not_found", "model_access_denied", "unsupported_model", "model_unavailable",
+        }
+    )
+
+
 def _generate_single_image(
         request: ConversationRequest,
         index: int,
@@ -1357,6 +1393,8 @@ def _generate_single_image(
     conn_timeout_retry_count = 0
     poll_timeout_retry_count = 0
     account_email = ""
+    rejected_web_tokens: set[str] = set()
+    last_web_model_error: ImageGenerationError | None = None
 
     while True:
         try:
@@ -1371,9 +1409,12 @@ def _generate_single_image(
                 plan_type=plan_type,
                 source_type=source_type,
                 plan_types=("plus", "team", "pro") if codex_model and not plan_type else None,
+                **({"excluded_tokens": rejected_web_tokens} if rejected_web_tokens else {}),
             )
         except RuntimeError as exc:
             message = str(exc) or "image generation failed"
+            if last_web_model_error is not None and "image quota" in message.lower():
+                raise last_web_model_error from exc
             if "image quota" in message.lower():
                 raise ImageGenerationError(
                     message, status_code=429, error_type="insufficient_quota",
@@ -1531,7 +1572,7 @@ def _generate_single_image(
             })
             if isinstance(exc, ImageStreamInterruptedError):
                 raise ImageGenerationError(
-                    "Codex 图片请求连接中断，提交状态无法确认；未自动重复发送。",
+                    "图片请求连接中断，提交状态无法确认；未自动重复发送。",
                     code="image_stream_interrupted", account_email=account_email,
                 ) from exc
             if _can_retry_image_request(backend, emitted_for_token) and is_token_invalid_error(last_error):
@@ -1541,16 +1582,28 @@ def _generate_single_image(
                     continue
                 account_service.remove_invalid_token(token, "image_stream")
                 continue
-            if isinstance(exc, UpstreamHTTPError) and is_gpt_image_25_model(request.model):
+            if isinstance(exc, UpstreamHTTPError) and (
+                is_gpt_image_25_model(request.model) or is_web_image_26_model(request.model)
+            ):
                 detail = exc.body.get("error", exc.body) if isinstance(exc.body, dict) else {}
                 detail = detail if isinstance(detail, dict) else {}
-                raise ImageGenerationError(
-                    str(detail.get("message") or "上游拒绝了所选 2.5 图片模型请求"),
+                model_error = ImageGenerationError(
+                    str(detail.get("message") or "上游拒绝了所选图片模型请求"),
                     status_code=exc.status_code,
                     error_type=str(detail.get("type") or "upstream_error"),
                     code=str(detail.get("code") or "upstream_error"),
                     param=detail.get("param"), account_email=account_email,
-                ) from exc
+                )
+                if (
+                    is_web_image_26_model(request.model)
+                    and _can_retry_image_request(backend, emitted_for_token)
+                    and _is_web_model_permission_rejection(exc.status_code, detail)
+                ):
+                    rejected_web_tokens.add(token)
+                    last_web_model_error = model_error
+                    if len(rejected_web_tokens) < 3:
+                        continue
+                raise model_error from exc
             # TLS/SSL 连接错误：自动重试
             if _can_retry_image_request(backend, emitted_for_token) and is_tls_connection_error(last_error):
                 tls_retry_count += 1

@@ -19,6 +19,7 @@ NEW_MODULES = [
     "test.test_gpt_image_25",
     "test.test_image_25_protocols",
     "test.test_free_web_image",
+    "test.test_web_image_26",
 ]
 BASELINE_MODULES = [
     "test.test_account_export",

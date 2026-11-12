@@ -5,12 +5,14 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { imageFileExtension, imageMimeType } from "@/lib/image-data";
 
 type LightboxImage = {
   id: string;
   src: string;
   sizeLabel?: string;
   dimensions?: string;
+  mimeType?: string;
 };
 
 type ImageLightboxProps = {
@@ -186,7 +188,7 @@ export function ImageLightbox({
     if (!current) return;
     const link = document.createElement("a");
     link.href = current.src;
-    link.download = `image-${current.id}.png`;
+    link.download = `image-${current.id}.${imageFileExtension(current.mimeType || imageMimeType({ url: current.src }))}`;
     link.click();
   }, [current]);
 

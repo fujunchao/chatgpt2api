@@ -15,6 +15,7 @@ from fastapi import HTTPException
 from PIL import Image
 
 from services.config import DATA_DIR, config
+from utils.image_format import inspect_image
 
 IMAGE_INDEX_FILE = DATA_DIR / "image_index.json"
 IMAGE_INDEX_LOCK = Lock()
@@ -198,11 +199,17 @@ class ImageStorageService:
 
     def make_relative_path(self, image_data: bytes) -> str:
         file_hash = hashlib.md5(image_data).hexdigest()
-        filename = f"{int(time.time())}_{file_hash}.png"
+        info = inspect_image(image_data)
+        extension = info.extension if info is not None and info.supported_static else ".png"
+        filename = f"{int(time.time())}_{file_hash}{extension}"
         relative_dir = Path(time.strftime("%Y"), time.strftime("%m"), time.strftime("%d"))
         return f"{relative_dir.as_posix()}/{filename}"
 
     def save(self, image_data: bytes, base_url: str | None = None) -> StoredImage:
+        info = inspect_image(image_data)
+        if info is not None and not info.supported_static:
+            raise ImageStorageError("当前图片存储仅支持静态 PNG/JPEG/WebP，不能丢弃动画帧")
+        mime_type = info.mime_type if info is not None else "image/png"
         config.cleanup_old_images()
         rel = self.make_relative_path(image_data)
         mode = self.mode()
@@ -219,7 +226,7 @@ class ImageStorageService:
             stored_local = True
 
         if mode in {"webdav", "both"}:
-            remote_url = WebDAVClient(self.settings()).put(rel, image_data)
+            remote_url = WebDAVClient(self.settings()).put(rel, image_data, content_type=mime_type)
             stored_webdav = True
 
         dimensions = _image_dimensions(image_data)
@@ -229,6 +236,7 @@ class ImageStorageService:
             "name": Path(rel).name,
             "date": "-".join(rel.split("/")[:3]),
             "size": len(image_data),
+            "mime_type": mime_type,
             "created_at": _now_iso(),
             "storage": "both" if stored_local and stored_webdav else ("webdav" if stored_webdav else "local"),
             "local": stored_local,

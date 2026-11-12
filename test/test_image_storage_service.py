@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from PIL import Image
 
 from services.image_storage_service import ImageStorageService
+from services import image_service
 
 
 def png_bytes() -> bytes:
@@ -19,12 +22,14 @@ def png_bytes() -> bytes:
 class FakeWebDAVClient:
     uploaded: dict[str, bytes] = {}
     deleted: list[str] = []
+    content_types: dict[str, str] = {}
 
     def __init__(self, _settings):
         pass
 
-    def put(self, rel: str, payload: bytes) -> str:
+    def put(self, rel: str, payload: bytes, content_type: str = "image/png") -> str:
         self.uploaded[rel] = payload
+        self.content_types[rel] = content_type
         return f"https://dav.example.test/{rel}"
 
     def get(self, rel: str) -> bytes:
@@ -65,6 +70,7 @@ class ImageStorageServiceTests(unittest.TestCase):
         self.mock_config.get_image_storage_settings.side_effect = lambda: dict(self.settings)
         FakeWebDAVClient.uploaded = {}
         FakeWebDAVClient.deleted = []
+        FakeWebDAVClient.content_types = {}
 
     def service(self) -> ImageStorageService:
         return ImageStorageService(self.data_dir / "image_index.json")
@@ -75,6 +81,66 @@ class ImageStorageServiceTests(unittest.TestCase):
         self.assertEqual(stored.storage, "local")
         self.assertTrue((self.images_dir / stored.rel).is_file())
         self.assertEqual(stored.url, f"http://app.test/images/{stored.rel}")
+
+    def test_static_formats_keep_original_bytes_extension_and_webdav_type(self):
+        self.settings.update({"enabled": True, "mode": "both", "webdav_url": "https://dav.example.test"})
+        for image_format, extension, mime in (("JPEG", ".jpg", "image/jpeg"), ("WEBP", ".webp", "image/webp")):
+            with self.subTest(format=image_format):
+                stream = BytesIO()
+                Image.new("RGB", (3, 2), "red").save(stream, format=image_format)
+                original = stream.getvalue()
+                with mock.patch("services.image_storage_service.WebDAVClient", FakeWebDAVClient):
+                    stored = self.service().save(original, "http://app.test")
+                self.assertTrue(stored.rel.endswith(extension), stored.rel)
+                self.assertEqual((self.images_dir / stored.rel).read_bytes(), original)
+                self.assertEqual(FakeWebDAVClient.content_types[stored.rel], mime)
+
+    def test_remote_preview_and_download_use_actual_image_type(self):
+        self.settings.update({"enabled": True, "mode": "webdav", "webdav_url": "https://dav.example.test"})
+        stream = BytesIO()
+        Image.new("RGB", (3, 2), "red").save(stream, format="JPEG")
+        original = stream.getvalue()
+        service = self.service()
+        with (
+            mock.patch("services.image_storage_service.WebDAVClient", FakeWebDAVClient),
+            mock.patch.object(image_service, "image_storage_service", service),
+        ):
+            stored = service.save(original, "http://app.test")
+            preview = image_service.get_image_response(stored.rel)
+            download = image_service.get_image_download_response(stored.rel)
+        self.assertEqual(preview.headers["content-type"], "image/jpeg")
+        self.assertEqual(download.headers["content-type"], "image/jpeg")
+        self.assertIn(".jpg", download.headers["content-disposition"])
+        self.assertEqual(preview.body, original)
+        self.assertEqual(download.body, original)
+
+    def test_storage_cleanup_dry_run_includes_jpeg_and_webp(self):
+        for image_format in ("JPEG", "WEBP"):
+            stream = BytesIO()
+            Image.new("RGB", (8, 8), "red").save(stream, format=image_format)
+            self.service().save(stream.getvalue(), "http://app.test")
+        with (
+            mock.patch.object(image_service, "config", self.mock_config),
+            mock.patch("shutil.disk_usage", return_value=SimpleNamespace(free=0)),
+        ):
+            result = image_service.delete_to_target(1, dry_run=True)
+        self.assertEqual(result["removed"], 2)
+        self.assertEqual(len(list(self.images_dir.rglob("*.jpg"))), 1)
+        self.assertEqual(len(list(self.images_dir.rglob("*.webp"))), 1)
+
+    def test_compression_keeps_jpeg_encoding_and_includes_its_extension(self):
+        image = Image.new("RGB", (96, 96))
+        image.putdata([(x * 17 % 256, y * 31 % 256, x * y % 256) for y in range(96) for x in range(96)])
+        stream = BytesIO()
+        image.save(stream, format="JPEG", quality=100)
+        stored = self.service().save(stream.getvalue(), "http://app.test")
+        with mock.patch.object(image_service, "config", self.mock_config):
+            result = image_service.compress_images(quality=40)
+        self.assertEqual(result["compressed"], 1)
+        path = self.images_dir / stored.rel
+        with Image.open(path) as compressed:
+            self.assertEqual(compressed.format, "JPEG")
+        self.assertLess(path.stat().st_size, len(stream.getvalue()))
 
     def test_webdav_mode_uploads_without_local_file(self):
         self.settings.update({

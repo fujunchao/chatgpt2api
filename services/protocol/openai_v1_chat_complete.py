@@ -18,6 +18,7 @@ from services.protocol.conversation import (
     encode_images,
     normalize_messages,
     stream_image_outputs_with_pool,
+    validate_image_request_parameters,
     stream_text_deltas,
     text_backend,
 )
@@ -295,6 +296,8 @@ def stream_image_chat_completion(image_outputs: Iterable[ImageOutput], model: st
 
 
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
+    if is_image_chat_request(body):
+        validate_image_request_parameters(str(body.get("model") or "gpt-image-2"), body)
     if body.get("stream"):
         if is_image_chat_request(body):
             return image_chat_events(body)

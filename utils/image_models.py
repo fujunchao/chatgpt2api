@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import re
 
 
@@ -44,6 +45,11 @@ IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS
 PUBLIC_IMAGE_MODELS = IMAGE_MODELS
 IMAGE_QUALITIES = ("auto", "low", "medium", "high")
 IMAGE_25_QUALITIES = (*IMAGE_QUALITIES, "xhigh", "max")
+WEB_IMAGE_26_NATIVE_OPTIONS = (
+    "output_format", "output_compression", "compression", "complexity", "frame_count",
+    "frame_duration_ms", "partial_images", "svg", "markup", "background", "moderation",
+    "input_fidelity", "seed",
+)
 
 
 class ImageModelParameterError(ValueError):
@@ -96,8 +102,27 @@ def image_model_qualities(model: object) -> tuple[str, ...]:
     return IMAGE_25_QUALITIES if is_gpt_image_25_model(model) else IMAGE_QUALITIES
 
 
+def validate_web_image_26_request_options(model: object, options: Mapping[str, object]) -> None:
+    """网页原生控制尚未得到协议证据；在入口丢弃未知字段前明确拒绝。"""
+    if not is_web_image_26_model(model):
+        return
+    for name in WEB_IMAGE_26_NATIVE_OPTIONS:
+        if options.get(name) is not None:
+            raise ImageModelParameterError(f"网页 Image 2.6 尚不支持原生参数 {name}", name)
+
+
 def validate_image_options(model: object, size: object, quality: object) -> tuple[object, str]:
-    """只约束新增 2.5 模型，不改变旧 2.0 请求的宽松参数行为。"""
+    """按通道校验选项；网页的尺寸与质量仍仅作为提示。"""
+    if is_web_image_26_model(model):
+        normalized_quality = str(quality or "auto").strip().lower()
+        if normalized_quality not in IMAGE_QUALITIES:
+            raise ImageModelParameterError("网页质量只能为 auto、low、medium、high", "quality")
+        normalized_size = str(size if size is not None else "").strip().lower()
+        if normalized_size in {"", "auto"}:
+            return None, normalized_quality
+        if not re.fullmatch(r"[1-9]\d{0,4}x[1-9]\d{0,4}", normalized_size):
+            raise ImageModelParameterError("网页尺寸提示须为 auto 或 WIDTHxHEIGHT", "size")
+        return normalized_size, normalized_quality
     if not is_gpt_image_25_model(model):
         return size, str(quality or "auto")
     normalized_quality = str(quality or "auto").strip().lower()

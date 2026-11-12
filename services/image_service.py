@@ -12,8 +12,9 @@ from fastapi.responses import FileResponse, Response
 from PIL import Image, ImageOps
 
 from services.config import config
-from services.image_storage_service import image_storage_service
+from services.image_storage_service import IMAGE_EXTENSIONS, image_storage_service
 from services.image_tags_service import load_tags, remove_tags
+from utils.image_format import image_mime_type
 from utils.log import logger
 
 THUMBNAIL_SIZE = (320, 320)
@@ -58,7 +59,8 @@ def get_image_response(relative_path: str) -> FileResponse | Response:
     }
     if image_storage_service.has_local(relative_path):
         return FileResponse(_safe_image_path(relative_path), headers=headers)
-    return Response(content=image_storage_service.get_bytes(relative_path), media_type="image/png", headers=headers)
+    payload = image_storage_service.get_bytes(relative_path)
+    return Response(content=payload, media_type=image_mime_type(payload), headers=headers)
 
 
 def _thumbnail_path(relative_path: str) -> Path:
@@ -113,7 +115,7 @@ def get_thumbnail_response(relative_path: str) -> FileResponse:
     return FileResponse(ensure_thumbnail(relative_path), headers=headers)
 
 
-def get_image_download_response(relative_path: str) -> FileResponse:
+def get_image_download_response(relative_path: str) -> FileResponse | Response:
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -128,9 +130,10 @@ def get_image_download_response(relative_path: str) -> FileResponse:
         **cors_headers,
         "Content-Disposition": f'attachment; filename="{Path(rel).name}"',
     }
+    payload = image_storage_service.get_bytes(rel)
     return Response(
-        content=image_storage_service.get_bytes(rel),
-        media_type="image/png",
+        content=payload,
+        media_type=image_mime_type(payload),
         headers=headers,
     )
 
@@ -255,14 +258,23 @@ def compress_images(quality: int = 60) -> dict:
     """重新压缩所有图片，返回节省的空间"""
     saved = 0
     count = 0
-    for p in sorted(config.images_dir.rglob("*.png")):
-        if not p.is_file():
+    for p in sorted(config.images_dir.rglob("*")):
+        if not p.is_file() or p.suffix.lower() not in IMAGE_EXTENSIONS:
             continue
         try:
             orig = p.stat().st_size
             with Image.open(p) as img:
+                if getattr(img, "is_animated", False):
+                    continue
                 img = ImageOps.exif_transpose(img)
-                img.save(str(p) + ".tmp", format="PNG", optimize=True)
+                if p.suffix.lower() == ".png":
+                    img.save(str(p) + ".tmp", format="PNG", optimize=True)
+                elif p.suffix.lower() == ".webp":
+                    img.save(str(p) + ".tmp", format="WEBP", quality=max(1, min(100, quality)))
+                else:
+                    img.convert("RGB").save(
+                        str(p) + ".tmp", format="JPEG", quality=max(1, min(100, quality)), optimize=True,
+                    )
             new_size = Path(str(p) + ".tmp").stat().st_size
             if new_size < orig:
                 Path(str(p) + ".tmp").replace(p)
@@ -284,7 +296,7 @@ def delete_to_target(target_free_mb: int, dry_run: bool = False) -> dict:
         return {"removed": 0, "current_free_mb": current_free, "target_free_mb": target_free_mb, "done": True}
 
     files = sorted(
-        (p for p in config.images_dir.rglob("*.png") if p.is_file()),
+        (p for p in config.images_dir.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS),
         key=lambda p: p.stat().st_mtime,
     )
     removed = 0

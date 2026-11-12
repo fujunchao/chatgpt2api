@@ -22,6 +22,8 @@ from services.protocol import (
 
 
 class ImageGenerationRequest(BaseModel):
+    # 原生参数必须先交给通道校验，不能被 Pydantic 静默丢弃。
+    model_config = ConfigDict(extra="allow")
     prompt: str = Field(..., min_length=1)
     model: str = "gpt-image-2"
     n: int = Field(default=1, ge=1, le=4)

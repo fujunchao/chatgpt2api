@@ -8,6 +8,7 @@ from services.protocol.conversation import (
     count_text_tokens,
     stream_image_chunks,
     stream_image_outputs_with_pool,
+    validate_image_request_parameters,
 )
 from utils.image_tokens import resolve_image_usage
 
@@ -15,6 +16,7 @@ from utils.image_tokens import resolve_image_usage
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
     prompt = str(body.get("prompt") or "")
     model = str(body.get("model") or "gpt-image-2")
+    validate_image_request_parameters(model, body)
     n = int(body.get("n") or 1)
     size = body.get("size")
     quality = str(body.get("quality") or "auto")

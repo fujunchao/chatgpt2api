@@ -31,6 +31,7 @@ import {
 } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import { normalizeImageQuality } from "@/lib/image-models";
+import { imageDataUrl, imageFileExtension, imageMimeType } from "@/lib/image-data";
 import { useSettingsStore } from "@/app/settings/store";
 import {
   clearImageConversations,
@@ -165,9 +166,9 @@ function buildReferenceImageFromResult(image: StoredImage, fileName: string): St
   }
 
   return {
-    name: fileName,
-    type: "image/png",
-    dataUrl: `data:image/png;base64,${image.b64_json}`,
+    name: `${fileName.replace(/\.[^.]+$/, "")}.${imageFileExtension(imageMimeType(image))}`,
+    type: imageMimeType(image),
+    dataUrl: imageDataUrl(image),
   };
 }
 

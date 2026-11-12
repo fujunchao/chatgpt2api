@@ -15,6 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from services.proxy_service import proxy_settings
+from services.protocol.conversation import validate_image_request_parameters
 
 ImageInput = tuple[bytes, str, str]
 ImageSource = str | UploadFile | ImageInput
@@ -62,6 +63,7 @@ def _parse_count(value: object) -> int:
 
 def _payload_from_fields(fields: dict[str, Any]) -> dict[str, Any]:
     """构造图片编辑载荷：从表单或 JSON 字段提取通用参数。"""
+    validate_image_request_parameters(str(fields.get("model") or "gpt-image-2"), fields)
     prompt = _clean(fields.get("prompt"))
     if not prompt:
         raise HTTPException(status_code=400, detail={"error": "prompt is required"})
@@ -183,8 +185,7 @@ async def parse_image_edit_request(request: Request) -> tuple[dict[str, Any], li
 
     form = await request.form()
     fields: dict[str, Any] = {}
-    for key in ("client_task_id", "prompt", "model", "n", "size", "quality", "response_format", "stream"):
-        value = form.get(key)
+    for key, value in form.multi_items():
         if isinstance(value, str):
             fields[key] = value
     sources: list[ImageSource] = []

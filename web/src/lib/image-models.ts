@@ -3,6 +3,11 @@ export function isWebAutoImageModel(model: string): boolean {
   return model.trim().toLowerCase() === "gpt-image-2.5";
 }
 
+/** 2.6 三个请求名称均使用网页账号，不能归入旧的 Codex 2.5 选项。 */
+export function isWebImage26Model(model: string): boolean {
+  return /^gpt-image-2\.6(?:-(?:flare|sunburst))?$/.test(model.trim().toLowerCase());
+}
+
 /** 此谓词只识别 Codex 2.5 请求选项，不代表上游已确认图片引擎身份。 */
 export function isGptImage25Model(model: string): boolean {
   return /^(?:gpt-image-2\.5-(?:flare|sunburst)|(?:(?:plus|team|pro)-)?codex-gpt-image-2\.5(?:-(?:flare|sunburst))?)$/.test(
@@ -15,12 +20,20 @@ export function isCodexImageModel(model: string): boolean {
 }
 
 export function imageModelLabel(model: string): string {
+  if (isWebImage26Model(model)) {
+    return model.trim().toLowerCase() === "gpt-image-2.6"
+      ? `${model} · Web（默认 Sunburst）`
+      : `${model} · Web`;
+  }
   if (isWebAutoImageModel(model)) return `${model} · Web 自动`;
   if (isCodexImageModel(model)) return `${model} · Codex`;
   return model;
 }
 
 export function imageModelDescription(model: string): string {
+  if (isWebImage26Model(model)) {
+    return "使用网页账号请求 Image 2.6 变体；账号权限由官网决定。尺寸和质量仅作为提示，以上游实际图片为准。";
+  }
   if (isWebAutoImageModel(model)) {
     return "使用网页账号额度（包括 Free）。复用 gpt-image-2 的网页请求；图片引擎由官网自动选择，具体版本未知，不能指定 Flare / Sunburst。尺寸和质量仅作为提示，以上游实际结果为准。";
   }

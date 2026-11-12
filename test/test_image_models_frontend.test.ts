@@ -45,3 +45,17 @@ describe("2.5 图片界面能力", () => {
     expect(normalizeImageQuality("gpt-image-2", "high")).toBe("high");
   });
 });
+
+describe("2.6 网页图片界面能力", () => {
+  test("三种入口标记为网页并保留网页质量提示", () => {
+    for (const name of ["gpt-image-2.6", "gpt-image-2.6-sunburst", "gpt-image-2.6-flare"]) {
+      expect(isCodexImageModel(name)).toBe(false);
+      expect(isGptImage25Model(name)).toBe(false);
+      expect(imageModelLabel(name)).toContain("Web");
+      expect(imageModelDescription(name)).toContain("网页");
+      expect(imageQualityOptions(name).map((option) => option.value)).toEqual(["auto", "low", "medium", "high"]);
+      expect(normalizeImageQuality(name, "max")).toBe("auto");
+    }
+    expect(imageModelLabel("gpt-image-2.6")).toContain("Sunburst");
+  });
+});

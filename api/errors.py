@@ -29,6 +29,16 @@ def _compatible_error_response(
 
 
 def install_exception_handlers(app: FastAPI) -> None:
+    from services.protocol.conversation import ImageGenerationError
+
+    @app.exception_handler(ImageGenerationError)
+    async def image_exception_handler(request: Request, exc: ImageGenerationError) -> JSONResponse:
+        # 编辑/任务入口的预检在 LoggedCall 之前，仍保留相同的参数错误结构。
+        detail = exc.to_openai_error()
+        if _is_openai_compatible_path(request.url.path):
+            return _compatible_error_response(request, detail, exc.status_code)
+        return JSONResponse(status_code=exc.status_code, content={"detail": jsonable_encoder(detail)})
+
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         if _is_openai_compatible_path(request.url.path):
