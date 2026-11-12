@@ -103,11 +103,15 @@ def image_model_qualities(model: object) -> tuple[str, ...]:
 
 
 def validate_web_image_26_request_options(model: object, options: Mapping[str, object]) -> None:
-    """网页原生控制尚未得到协议证据；在入口丢弃未知字段前明确拒绝。"""
+    """允许客户端默认 PNG；其余未接通的网页原生控制在入口明确拒绝。"""
     if not is_web_image_26_model(model):
         return
     for name in WEB_IMAGE_26_NATIVE_OPTIONS:
-        if options.get(name) is not None:
+        value = options.get(name)
+        # CVA 等 OpenAI 图片客户端固定传 PNG，仅作为兼容默认值，不传给网页协议。
+        if name == "output_format" and isinstance(value, str) and value.strip().lower() == "png":
+            continue
+        if value is not None:
             raise ImageModelParameterError(f"网页 Image 2.6 尚不支持原生参数 {name}", name)
 
 

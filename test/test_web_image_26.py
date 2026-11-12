@@ -336,6 +336,32 @@ class WebImage26Tests(WebImageFixture):
                 self.assertEqual(response.json()["error"]["param"], param)
                 self.assertEqual(self.requests, [])
 
+    def test_cva_default_png_is_compatible_with_web_image_edits(self):
+        self.enable_fixture_upstream()
+        response = self.client.post("/v1/images/edits", headers=HEADERS, data={
+            "model": "gpt-image-2.6-flare", "prompt": "将参考图改为红色",
+            "output_format": "png",
+        }, files={"image": ("reference.png", self.image, "image/png")})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(base64.b64decode(response.json()["data"][0]["b64_json"]), self.image)
+        stages = [item for item in self.requests if "/f/conversation" in item["url"]]
+        self.assertEqual([item["json"]["model"] for item in stages], ["gpt-image-2.6-flare", "gpt-image-2.6-flare"])
+        self.assertTrue(all("output_format" not in item["json"] for item in stages))
+
+    def test_cva_default_png_is_compatible_with_web_image_generation(self):
+        self.enable_fixture_upstream()
+        for output_format in ("png", " PNG "):
+            with self.subTest(output_format=output_format):
+                self.requests.clear()
+                self.accounts.update_account("fixture-web-free", {"quota": 3, "status": "正常"})
+                response = self.client.post("/v1/images/generations", headers=HEADERS, json={
+                    "model": "gpt-image-2.6-sunburst", "prompt": "画一个蓝色圆形", "output_format": output_format,
+                })
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(base64.b64decode(response.json()["data"][0]["b64_json"]), self.image)
+                self.assertEqual([item["json"]["model"] for item in self.requests], ["gpt-image-2.6-sunburst", "gpt-image-2.6-sunburst"])
+                self.assertTrue(all("output_format" not in item["json"] for item in self.requests))
+
     def test_edit_rejects_native_controls_before_decoding_or_uploading(self):
         self.enable_fixture_upstream()
         response = self.client.post("/v1/images/edits", headers=HEADERS, json={
