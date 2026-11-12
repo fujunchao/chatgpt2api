@@ -1,6 +1,8 @@
-# v0.16.4：Image 2.6 网页账号接入
+# v0.16.5：Image 2.6 网页账号接入
 
 本版本通过现有 ChatGPT 网页账号接入 Image 2.6，使用网页 `picture_v2` 图片会话。两个具体变体在准备和提交请求中均保留完整型号；短名由本项目固定映射。
+
+v0.16.5 修复 CVA 固定携带的 PNG 默认参数在 v0.16.4 被预检拦截的问题。生成和编辑均接受 `output_format="png"`（也接受大小写及首尾空白的规范化写法），CVA 无需调整。
 
 ## 模型与账号
 
@@ -46,7 +48,7 @@ Responses 图片工具示例：
 
 - 网页质量提示支持 `auto/low/medium/high`；尺寸提示可为 `auto` 或 `WIDTHxHEIGHT`。实际返回分辨率和质量由上游决定。
 - 首期接收静态 PNG、JPEG、WebP，保留原始字节、正确后缀与媒体类型；下载及继续编辑沿用实际格式。
-- 网页原生 `output_format`、GIF 帧参数、SVG、复杂度等控制尚未开放。明确填写未支持字段会在发送请求前报错，包括 Responses 顶层和工具内字段。
+- `output_format="png"` 作为客户端兼容默认值接受，不作为网页原生格式控制发送；实际输出格式仍以上游为准。JPEG/WebP/GIF/SVG 的主动格式选择、GIF 帧参数、复杂度等控制尚未开放，明确填写未支持值会在发送请求前报错，包括 Responses 顶层和工具内字段。
 - 动画、SVG 或未知输出格式会明确报错，不转换成静态 PNG，不因结果格式失败重复生成。
 - 没有可确认的上游数字用量时省略 `usage`，返回 `usage_source="unavailable"`，界面显示不可用。
 
@@ -60,6 +62,8 @@ Responses 图片工具示例：
 
 ## 验证记录
 
+- v0.16.5：215 项后端离线回归通过，新增 CVA 默认 PNG 的生成与编辑兼容回归；补丁规范与需求复查均为 0 项问题。
+- v0.16.5：服务器隔离验收的 PNG 默认参数生成和参考图编辑均返回 200 / PNG，每项只提交一次；前端生产构建通过。线上使用需要将 C2A 镜像更新到 `0.16.5`。
 - 213 项后端离线回归通过，覆盖新模型、Free/OAuth 来源、旧模型、各兼容入口、参数、用量、任务、跨重启恢复、存储及提交中断。
 - 7 项前端逻辑测试、独立 TypeScript 类型检查与前端生产构建通过。
 - 对业务源码 `382792116d45d1b8b07197906eadbcdb9375e51a` 的规范与需求两轴审查均为 0 项剩余问题。
@@ -69,13 +73,13 @@ Responses 图片工具示例：
 
 ## 升级
 
-镜像：`ghcr.io/fujunchao/chatgpt2api:0.16.4`，支持 `linux/amd64`、`linux/arm64`。
+镜像：`ghcr.io/fujunchao/chatgpt2api:0.16.5`，支持 `linux/amd64`、`linux/arm64`。
 
 ```bash
 docker compose pull app
 docker compose up -d --no-deps app
 ```
 
-保留现有 `config.json` 与 `data/`。升级后确认面板版本 `0.16.4`，重新获取模型目录并选择对应网页变体。默认 Compose 文件已固定到本版本；本地源码构建也可沿用 `docker-compose.image25.yml`。
+保留现有 `config.json` 与 `data/`。升级后确认面板版本 `0.16.5`，重新获取模型目录并选择对应网页变体。默认 Compose 文件已固定到本版本；本地源码构建也可沿用 `docker-compose.image25.yml`。
 
 上游及 fork 依据见 [完整调研](image26-research-2026-11-12.zh-CN.md) 与 [七个网页实现证据](research/image26-web-channel-evidence.zh-CN.md)。

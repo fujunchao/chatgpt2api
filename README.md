@@ -17,6 +17,10 @@
 
 ## 快速开始
 
+### v0.16.5：修复 CVA 的默认 PNG 参数兼容
+
+CVA 在生成和编辑请求中固定携带 `output_format="png"`。v0.16.5 修复网页 Image 2.6 将这个默认值误判为未支持原生控制、直接返回 400 的问题，CVA 无需修改请求。镜像：`ghcr.io/fujunchao/chatgpt2api:0.16.5`；详细能力边界见 [网页接入说明](./docs/image26-web-integration.zh-CN.md)。
+
 ### v0.16.4：网页 Image 2.6
 
 新增 `gpt-image-2.6-sunburst`、`gpt-image-2.6-flare` 两个网页图片入口，以及固定请求 Sunburst 的短名 `gpt-image-2.6`。使用现有网页登录账号和图片额度，支持文生图、参考图编辑、Chat/Responses 兼容入口及后台任务；准备与提交请求均保留具体 2.6 型号。
