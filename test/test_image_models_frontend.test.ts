@@ -7,6 +7,7 @@ import {
   isGptImage25Model,
   isWebAutoImageModel,
   normalizeImageQuality,
+  normalizeImageOutputFormat,
 } from "../web/src/lib/image-models";
 
 describe("2.5 图片界面能力", () => {
@@ -47,6 +48,16 @@ describe("2.5 图片界面能力", () => {
 });
 
 describe("2.6 网页图片界面能力", () => {
+  test("GIF 只用于网页 2.6，切换模型恢复静态格式", () => {
+    for (const model of ["gpt-image-2.6", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst"]) {
+      expect(normalizeImageOutputFormat(model, "gif")).toBe("gif");
+      expect(normalizeImageOutputFormat(model, null)).toBe("png");
+    }
+    for (const model of ["gpt-image-2", "gpt-image-2.5", "codex-gpt-image-2.5-flare"]) {
+      expect(normalizeImageOutputFormat(model, "gif")).toBe("png");
+    }
+  });
+
   test("三种入口标记为网页并保留网页质量提示", () => {
     for (const name of ["gpt-image-2.6", "gpt-image-2.6-sunburst", "gpt-image-2.6-flare"]) {
       expect(isCodexImageModel(name)).toBe(false);

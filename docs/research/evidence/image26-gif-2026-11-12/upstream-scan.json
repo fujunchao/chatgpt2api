@@ -1,0 +1,51 @@
+{
+  "repo": "basketikun/chatgpt2api",
+  "sha": "92dd80e91543157d36a4ddad60e765c5293760e9",
+  "url": "https://codeload.github.com/basketikun/chatgpt2api/tar.gz/92dd80e91543157d36a4ddad60e765c5293760e9",
+  "archive_bytes": 540248,
+  "archive_sha256": "2feb9ea7c0f166b35553406ef203d9dcc88a975f83af6d043bef7a8e18607054",
+  "scanned_non_nul_files": 206,
+  "image26_hit_files": [],
+  "gif_hit_files": [
+    {
+      "path": "test/utils.py",
+      "lines": [
+        {
+          "line": 38,
+          "text": "        return \".gif\""
+        }
+      ],
+      "url": "https://github.com/basketikun/chatgpt2api/blob/92dd80e91543157d36a4ddad60e765c5293760e9/test/utils.py"
+    },
+    {
+      "path": "utils/helper.py",
+      "lines": [
+        {
+          "line": 28,
+          "text": "SUPPORTED_JSON_IMAGE_MIME_TYPES = {\"image/png\", \"image/jpeg\", \"image/jpg\", \"image/webp\", \"image/gif\"}"
+        }
+      ],
+      "url": "https://github.com/basketikun/chatgpt2api/blob/92dd80e91543157d36a4ddad60e765c5293760e9/utils/helper.py"
+    },
+    {
+      "path": "web/src/app/debug/components/chat-panel.tsx",
+      "lines": [
+        {
+          "line": 169,
+          "text": "            <input id=\"chat-images\" type=\"file\" accept=\"image/png,image/jpeg,image/webp,image/gif\" multiple className=\"sr-only\" onChange={(event) => {"
+        }
+      ],
+      "url": "https://github.com/basketikun/chatgpt2api/blob/92dd80e91543157d36a4ddad60e765c5293760e9/web/src/app/debug/components/chat-panel.tsx"
+    },
+    {
+      "path": "web/src/app/image/components/image-composer.tsx",
+      "lines": [
+        {
+          "line": 42,
+          "text": "const imageFileNamePattern = /\\.(avif|bmp|gif|heic|heif|ico|jpe?g|png|svg|tiff?|webp)$/i;"
+        }
+      ],
+      "url": "https://github.com/basketikun/chatgpt2api/blob/92dd80e91543157d36a4ddad60e765c5293760e9/web/src/app/image/components/image-composer.tsx"
+    }
+  ]
+}

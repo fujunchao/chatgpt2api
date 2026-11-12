@@ -25,6 +25,8 @@ export function ConfigCard() {
   const setRefreshAccountIntervalMinute = useSettingsStore((state) => state.setRefreshAccountIntervalMinute);
   const setImageRetentionDays = useSettingsStore((state) => state.setImageRetentionDays);
   const setImagePollTimeoutSecs = useSettingsStore((state) => state.setImagePollTimeoutSecs);
+  const setImageWebGifEnabled = useSettingsStore((state) => state.setImageWebGifEnabled);
+  const setImageGifPollTimeoutSecs = useSettingsStore((state) => state.setImageGifPollTimeoutSecs);
   const setImageAccountConcurrency = useSettingsStore((state) => state.setImageAccountConcurrency);
   const setImageSettleEnabled = useSettingsStore((state) => state.setImageSettleEnabled);
   const setImageRemoveConversationAfterResult = useSettingsStore((state) => state.setImageRemoveConversationAfterResult);
@@ -165,6 +167,26 @@ export function ConfigCard() {
               className="h-10 rounded-xl border-stone-200 bg-white"
             />
             <p className="text-xs text-stone-500">单位秒，等待上游图片结果的最长时间。</p>
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
+              <Checkbox
+                checked={config?.image_web_gif_enabled !== false}
+                onCheckedChange={(checked) => setImageWebGifEnabled(Boolean(checked))}
+              />
+              网页 2.6 GIF 实验功能
+            </label>
+            <p className="text-xs text-stone-500">允许请求多帧 GIF。关闭后，新 GIF 请求会明确失败，历史动画仍可播放和下载。</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm text-stone-700">GIF 轮询超时</label>
+            <Input
+              value={String(config?.image_gif_poll_timeout_secs || "300")}
+              onChange={(event) => setImageGifPollTimeoutSecs(event.target.value)}
+              placeholder="300"
+              className="h-10 rounded-xl border-stone-200 bg-white"
+            />
+            <p className="text-xs text-stone-500">单位秒，GIF 使用独立的等待预算，默认 300 秒。</p>
           </div>
           <div className="space-y-2">
             <label className="text-sm text-stone-700">单账号图片并发</label>

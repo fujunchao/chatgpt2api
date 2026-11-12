@@ -13,6 +13,7 @@ from services.config import DATA_DIR, config
 from services.content_filter import request_text
 from services.log_service import LOG_TYPE_CALL, log_service
 from services.protocol import openai_v1_image_edit, openai_v1_image_generations
+from services.protocol.conversation import validate_image_request_parameters
 
 TASK_STATUS_QUEUED = "queued"
 TASK_STATUS_RUNNING = "running"
@@ -75,6 +76,9 @@ def _public_task(task: dict[str, Any]) -> dict[str, Any]:
     }
     if task.get("conversation_id"):
         item["conversation_id"] = task.get("conversation_id")
+    for name in ("output_format", "frame_count", "frame_duration_ms"):
+        if task.get(name) is not None:
+            item[name] = task[name]
     if task.get("data") is not None:
         item["data"] = task.get("data")
     if task.get("usage") is not None:
@@ -131,6 +135,9 @@ class ImageTaskService:
         model: str,
         size: str | None,
         quality: str = "auto",
+        output_format: str | None = None,
+        frame_count: int | None = None,
+        frame_duration_ms: int | None = None,
         base_url: str = "",
     ) -> dict[str, Any]:
         payload = {
@@ -139,6 +146,9 @@ class ImageTaskService:
             "n": 1,
             "size": size,
             "quality": quality,
+            "output_format": output_format,
+            "frame_count": frame_count,
+            "frame_duration_ms": frame_duration_ms,
             "response_format": "url",
             "base_url": base_url,
         }
@@ -153,6 +163,9 @@ class ImageTaskService:
         model: str,
         size: str | None,
         quality: str = "auto",
+        output_format: str | None = None,
+        frame_count: int | None = None,
+        frame_duration_ms: int | None = None,
         base_url: str = "",
         images: list[tuple[bytes, str, str]] | None = None,
         masks: list[tuple[bytes, str, str]] | None = None,
@@ -165,6 +178,9 @@ class ImageTaskService:
             "n": 1,
             "size": size,
             "quality": quality,
+            "output_format": output_format,
+            "frame_count": frame_count,
+            "frame_duration_ms": frame_duration_ms,
             "response_format": "url",
             "base_url": base_url,
         }
@@ -202,6 +218,7 @@ class ImageTaskService:
         mode: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
+        payload = {**payload, **validate_image_request_parameters(_clean(payload.get("model"), "gpt-image-2"), payload)}
         task_id = _clean(client_task_id)
         if not task_id:
             raise ValueError("client_task_id is required")
@@ -224,6 +241,9 @@ class ImageTaskService:
                 "model": _clean(payload.get("model"), "gpt-image-2"),
                 "size": _clean(payload.get("size")),
                 "quality": _clean(payload.get("quality"), "auto"),
+                "output_format": payload.get("output_format"),
+                "frame_count": payload.get("frame_count"),
+                "frame_duration_ms": payload.get("frame_duration_ms"),
                 "created_at": now,
                 "updated_at": now,
                 "created_ts": time.time(),
@@ -393,6 +413,9 @@ class ImageTaskService:
                 "model": _clean(item.get("model"), "gpt-image-2"),
                 "size": _clean(item.get("size")),
                 "quality": _clean(item.get("quality"), "auto"),
+                "output_format": _clean(item.get("output_format")).lower() or None,
+                "frame_count": item.get("frame_count"),
+                "frame_duration_ms": item.get("frame_duration_ms"),
                 "created_at": _clean(item.get("created_at"), _now_iso()),
                 "updated_at": _clean(item.get("updated_at"), _clean(item.get("created_at"), _now_iso())),
                 "created_ts": item.get("created_ts"),
@@ -500,12 +523,13 @@ class ImageTaskService:
         try:
             from services.openai_backend_api import OpenAIBackendAPI
             from services.protocol.conversation import (
-                ImageOutput, collect_image_outputs, encode_generated_image, format_image_result,
+                ImageOutput, collect_image_outputs, encode_generated_images, format_image_result,
             )
 
             with self._lock:
                 task = self._tasks.get(key) or {}
                 recovery_key = _clean(task.get("recovery_account_key"))
+                output_format = _clean(task.get("output_format")) or None
             token = account_service.get_image_recovery_access_token(recovery_key)
             if not token:
                 raise RuntimeError("无法定位原网页账号，不能继续读取该会话；未重新提交图片请求。")
@@ -525,10 +549,7 @@ class ImageTaskService:
             if not image_urls:
                 raise RuntimeError("图片 URL 解析失败")
 
-            image_items = [
-                {"b64_json": encode_generated_image(image_data, model)}
-                for image_data in backend.download_image_bytes(image_urls)
-            ]
+            image_items = encode_generated_images(backend.download_image_bytes(image_urls), model, output_format)
             data = format_image_result(
                 image_items,
                 "",  # prompt 已不重要，结果已经拿到了

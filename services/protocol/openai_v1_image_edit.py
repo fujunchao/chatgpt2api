@@ -14,6 +14,7 @@ from services.protocol.conversation import (
     stream_image_chunks,
     stream_image_outputs_with_pool,
     validate_image_request_parameters,
+    validate_gif_reference_images,
 )
 from utils.image_tokens import count_image_inputs_tokens, resolve_image_usage
 
@@ -52,9 +53,12 @@ def _composite_mask(
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
     prompt = str(body.get("prompt") or "")
     model = str(body.get("model") or "gpt-image-2")
-    validate_image_request_parameters(model, body)
+    image_options = validate_image_request_parameters(model, body)
     images = body.get("images") or []
     masks = body.get("mask") or []
+    if image_options.get("output_format") == "gif":
+        validate_gif_reference_images(data for data, _, _ in images)
+        validate_gif_reference_images((data for data, _, _ in masks), param="mask")
     images = _composite_mask(images, masks)
     n = int(body.get("n") or 1)
     size = body.get("size")
@@ -72,6 +76,7 @@ def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
         size=size,
         quality=quality,
         response_format=response_format,
+        **image_options,
         base_url=base_url,
         images=encoded_images,
         message_as_error=True,

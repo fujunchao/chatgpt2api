@@ -176,6 +176,8 @@ function normalizeConfig(config: SettingsConfig): SettingsConfig {
     refresh_account_interval_minute: Number(config.refresh_account_interval_minute || 5),
     image_retention_days: Number(config.image_retention_days || 30),
     image_poll_timeout_secs: Number(config.image_poll_timeout_secs || 120),
+    image_web_gif_enabled: config.image_web_gif_enabled !== false,
+    image_gif_poll_timeout_secs: Number(config.image_gif_poll_timeout_secs || 300),
     image_account_concurrency: Number(config.image_account_concurrency || 3),
     image_settle_enabled: Boolean(config.image_settle_enabled !== false),
     image_check_before_hit_enabled: Boolean(config.image_check_before_hit_enabled !== false),
@@ -301,6 +303,8 @@ type SettingsStore = {
   setRefreshAccountIntervalMinute: (value: string) => void;
   setImageRetentionDays: (value: string) => void;
   setImagePollTimeoutSecs: (value: string) => void;
+  setImageWebGifEnabled: (value: boolean) => void;
+  setImageGifPollTimeoutSecs: (value: string) => void;
   setImageAccountConcurrency: (value: string) => void;
   setImageSettleEnabled: (value: boolean) => void;
   setImageCheckBeforeHitEnabled: (value: boolean) => void;
@@ -449,6 +453,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         refresh_account_interval_minute: Math.max(1, Number(config.refresh_account_interval_minute) || 1),
         image_retention_days: Math.max(1, Number(config.image_retention_days) || 30),
         image_poll_timeout_secs: Math.max(1, Number(config.image_poll_timeout_secs) || 120),
+        image_web_gif_enabled: config.image_web_gif_enabled !== false,
+        image_gif_poll_timeout_secs: Math.max(1, Number(config.image_gif_poll_timeout_secs) || 300),
         image_account_concurrency: Math.max(1, Number(config.image_account_concurrency) || 3),
         image_settle_enabled: Boolean(config.image_settle_enabled !== false),
         image_check_before_hit_enabled: Boolean(config.image_check_before_hit_enabled !== false),
@@ -550,6 +556,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setImagePollTimeoutSecs: (value) => {
     set((state) => state.config ? { config: { ...state.config, image_poll_timeout_secs: value } } : {});
+  },
+
+  setImageWebGifEnabled: (value) => {
+    set((state) => state.config ? { config: { ...state.config, image_web_gif_enabled: value } } : {});
+  },
+
+  setImageGifPollTimeoutSecs: (value) => {
+    set((state) => state.config ? { config: { ...state.config, image_gif_poll_timeout_secs: value } } : {});
   },
 
   setImageAccountConcurrency: (value) => {

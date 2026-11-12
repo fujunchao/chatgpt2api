@@ -1,0 +1,16 @@
+{
+  "enumerated_nodes": 1774,
+  "branch_refs": 2351,
+  "verified_sha_scans": 907,
+  "status_counts": {
+    "readable": 1745,
+    "NOT_FOUND": 29
+  },
+  "web_forks": 8,
+  "different_web_heads": 8,
+  "current_web_heads_match_inventory": true,
+  "source_excerpts": 73,
+  "free_gif_live_verified": false,
+  "synthetic_local_gif_probe_consistent": true,
+  "production_code_changed": false
+}

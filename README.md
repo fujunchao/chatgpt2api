@@ -17,6 +17,12 @@
 
 ## 快速开始
 
+### v0.17.0：网页 Image 2.6 GIF（实验）
+
+三个网页 2.6 入口现在接受 `output_format="gif"`，支持文生动画和静态参考图动画化。网页工作台可选择“GIF（实验）”，播放、下载、历史复用和任务恢复均保留原动画。通过提示词请求动画，真实结果必须是可完整解码的多帧 GIF；具体账号权限、帧数和尺寸以上游返回为准。
+
+Free/OAuth 网页账号的 Flare、Sunburst 生成及参考图动画化四项实测均返回 9 帧 GIF，每项只提交一次。用法见 [GIF 接入说明](./docs/image26-gif-guide.zh-CN.md)，原图与记录见 [真实验收](./docs/research/image26-gif-acceptance-2026-11-12.zh-CN.md)。镜像：`ghcr.io/fujunchao/chatgpt2api:0.17.0`。
+
 ### v0.16.5：修复 CVA 的默认 PNG 参数兼容
 
 CVA 在生成和编辑请求中固定携带 `output_format="png"`。v0.16.5 修复网页 Image 2.6 将这个默认值误判为未支持原生控制、直接返回 400 的问题，CVA 无需修改请求。镜像：`ghcr.io/fujunchao/chatgpt2api:0.16.5`；详细能力边界见 [网页接入说明](./docs/image26-web-integration.zh-CN.md)。

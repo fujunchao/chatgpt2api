@@ -23,6 +23,7 @@ import {
   fetchAccounts,
   fetchModels,
   fetchImageTasks,
+  fetchImageCapabilities,
   resumeImagePoll,
   type Account,
   type ImageModel,
@@ -30,7 +31,7 @@ import {
   type ImageTask,
 } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
-import { normalizeImageQuality } from "@/lib/image-models";
+import { normalizeImageQuality, normalizeImageOutputFormat, type ImageOutputFormat } from "@/lib/image-models";
 import { imageDataUrl, imageFileExtension, imageMimeType } from "@/lib/image-data";
 import { useSettingsStore } from "@/app/settings/store";
 import {
@@ -54,6 +55,7 @@ const IMAGE_RATIO_STORAGE_KEY = "chatgpt2api:image_last_ratio";
 const IMAGE_TIER_STORAGE_KEY = "chatgpt2api:image_last_tier";
 const IMAGE_QUALITY_STORAGE_KEY = "chatgpt2api:image_last_quality";
 const IMAGE_MODEL_STORAGE_KEY = "chatgpt2api:image_last_model";
+const IMAGE_OUTPUT_FORMAT_STORAGE_KEY = "chatgpt2api:image_last_output_format";
 const IMAGE_COUNT_STORAGE_KEY = "chatgpt2api:image_last_count";
 const SCROLL_POSITIONS_STORAGE_KEY = "chatgpt2api:image_scroll_positions";
 const SCROLL_TO_LATEST_THRESHOLD = 160;
@@ -226,6 +228,14 @@ function taskDataToStoredImage(image: StoredImage, task: ImageTask): StoredImage
       b64_json: first.b64_json,
       url: first.url,
       revised_prompt: first.revised_prompt,
+      format: first.format,
+      output_format: first.output_format,
+      mime_type: first.mime_type,
+      animated: first.animated,
+      frame_count: first.frame_count,
+      frame_durations_ms: first.frame_durations_ms,
+      duration_ms: first.duration_ms,
+      loop: first.loop,
       error: undefined,
       durationMs: task.duration_ms,
     };
@@ -472,6 +482,10 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   const [imageHeight, setImageHeight] = useState("1024");
   const [imageQuality, setImageQuality] = useState("auto");
   const [imageModel, setImageModel] = useState<ImageModel>("gpt-image-2");
+  const [imageOutputFormat, setImageOutputFormat] = useState<ImageOutputFormat>("png");
+  const [imageFrameCount, setImageFrameCount] = useState<number | undefined>();
+  const [imageFrameDurationMs, setImageFrameDurationMs] = useState<number | undefined>();
+  const [gifEnabled, setGifEnabled] = useState(false);
   const [modelPreferenceLoaded, setModelPreferenceLoaded] = useState(false);
   const [imageModels, setImageModels] = useState<ImageModel[]>(["gpt-image-2"]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -615,6 +629,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_QUALITY_STORAGE_KEY) : null;
       const storedModel =
         typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_MODEL_STORAGE_KEY) : null;
+      const storedOutputFormat =
+        typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_OUTPUT_FORMAT_STORAGE_KEY) : null;
       const storedCount =
         typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_COUNT_STORAGE_KEY) : null;
       setImageRatio(storedRatio || "1:1");
@@ -623,6 +639,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       setImageHeight("1024");
       const restoredModel = storedModel?.trim() || "gpt-image-2";
       setImageModel(restoredModel);
+      setImageOutputFormat(normalizeImageOutputFormat(restoredModel, storedOutputFormat));
       setImageQuality(normalizeImageQuality(restoredModel, storedQuality || "auto"));
       setModelPreferenceLoaded(true);
       setImageCount(storedCount ? clampImageCount(storedCount) : "1");
@@ -672,6 +689,16 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     window.addEventListener("pageshow", handlePageShow);
     return () => window.removeEventListener("pageshow", handlePageShow);
   }, [loadHistory]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchImageCapabilities().then((capabilities) => {
+      if (!cancelled) setGifEnabled(capabilities.web_gif_enabled);
+    }).catch(() => {
+      if (!cancelled) setGifEnabled(false);
+    });
+    return () => { cancelled = true; };
+  }, [config?.image_web_gif_enabled]);
 
   useEffect(() => {
     loadCancelledRef.current = false;
@@ -867,11 +894,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     window.localStorage.setItem(IMAGE_TIER_STORAGE_KEY, imageTier);
     window.localStorage.setItem(IMAGE_QUALITY_STORAGE_KEY, imageQuality);
     window.localStorage.setItem(IMAGE_MODEL_STORAGE_KEY, imageModel);
-  }, [imageRatio, imageTier, imageQuality, imageModel, modelPreferenceLoaded]);
+    window.localStorage.setItem(IMAGE_OUTPUT_FORMAT_STORAGE_KEY, imageOutputFormat);
+  }, [imageRatio, imageTier, imageQuality, imageModel, imageOutputFormat, modelPreferenceLoaded]);
 
   useEffect(() => {
     if (modelPreferenceLoaded) {
       setImageQuality((quality) => normalizeImageQuality(imageModel, quality));
+      setImageOutputFormat((format) => normalizeImageOutputFormat(imageModel, format));
     }
   }, [imageModel, modelPreferenceLoaded]);
 
@@ -1120,6 +1149,11 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   const handleContinueEdit = useCallback(
     async (conversationId: string, image: StoredImage | StoredReferenceImage) => {
       try {
+        const mimeType = "dataUrl" in image ? image.type : imageMimeType(image);
+        if (mimeType === "image/gif") {
+          toast.error("暂不支持继续编辑 GIF 动画，请使用静态参考图进行动画化");
+          return;
+        }
         const nextReference =
           "dataUrl" in image
             ? {
@@ -1163,6 +1197,9 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     setImageHeight(parsedSize.height);
     setImageQuality(turn.quality);
     setImageModel(turn.model);
+    setImageOutputFormat(normalizeImageOutputFormat(turn.model, turn.outputFormat));
+    setImageFrameCount(turn.frameCount);
+    setImageFrameDurationMs(turn.frameDurationMs);
     setReferenceImages(turn.referenceImages);
     setReferenceImageFiles(
       turn.referenceImages.map((image) => dataUrlToFile(image.dataUrl, image.name, image.type)),
@@ -1250,12 +1287,17 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         }
 
         const pendingImages = activeTurn.images.filter((image) => image.status === "loading");
+        const outputOptions = {
+          output_format: activeTurn.outputFormat || "png",
+          frame_count: activeTurn.frameCount,
+          frame_duration_ms: activeTurn.frameDurationMs,
+        };
         const submitted = await Promise.all(
           pendingImages.map((image) => {
             const taskId = image.taskId || image.id;
             return activeTurn.mode === "edit"
-              ? createImageEditTask(taskId, referenceFiles, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality)
-              : createImageGenerationTask(taskId, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality);
+              ? createImageEditTask(taskId, referenceFiles, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality, outputOptions)
+              : createImageGenerationTask(taskId, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality, outputOptions);
           }),
         );
         await applyTasks(submitted);
@@ -1306,8 +1348,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
               const resubmitted = await Promise.all(
                 missingImages.map((image) =>
                   activeTurn.mode === "edit"
-                    ? createImageEditTask(image.taskId || image.id, referenceFiles, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality)
-                    : createImageGenerationTask(image.taskId || image.id, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality),
+                    ? createImageEditTask(image.taskId || image.id, referenceFiles, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality, outputOptions)
+                    : createImageGenerationTask(image.taskId || image.id, activeTurn.prompt, activeTurn.model, activeTurn.size, activeTurn.quality, outputOptions),
                 ),
               );
               if (resubmitted.length > 0) {
@@ -1387,6 +1429,9 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         ratio: sourceTurn.ratio,
         tier: sourceTurn.tier,
         quality: sourceTurn.quality,
+        outputFormat: sourceTurn.outputFormat,
+        frameCount: sourceTurn.frameCount,
+        frameDurationMs: sourceTurn.frameDurationMs,
         images: createLoadingImages(nextTurnId, count),
         createdAt: now,
         status: "queued",
@@ -1565,6 +1610,11 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       return;
     }
 
+    if (imageOutputFormat === "gif" && !gifEnabled) {
+      toast.error("GIF 实验功能当前未启用，请选择静态图片或由管理员开启");
+      return;
+    }
+
     const effectiveImageMode: ImageConversationMode = referenceImageFiles.length > 0 ? "edit" : "generate";
 
     const targetConversation = selectedConversationId
@@ -1585,6 +1635,9 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       ratio: imageRatio,
       tier: imageTier,
       quality: imageQuality,
+      outputFormat: imageOutputFormat,
+      frameCount: imageOutputFormat === "gif" ? imageFrameCount : undefined,
+      frameDurationMs: imageOutputFormat === "gif" ? imageFrameDurationMs : undefined,
       images: createLoadingImages(turnId, parsedCount),
       createdAt: now,
       status: "queued",
@@ -1742,6 +1795,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
             imageHeight={imageHeight}
             imageQuality={imageQuality}
             imageModel={imageModel}
+            imageOutputFormat={imageOutputFormat}
+            gifEnabled={gifEnabled}
             imageModels={imageModels}
             availableQuota={availableQuota}
             activeTaskCount={activeTaskCount}
@@ -1756,6 +1811,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
             onImageHeightChange={setImageHeight}
             onImageQualityChange={setImageQuality}
             onImageModelChange={setImageModel}
+            onImageOutputFormatChange={setImageOutputFormat}
             onSubmit={handleSubmit}
             onPickReferenceImage={() => fileInputRef.current?.click()}
             onReferenceImageChange={handleReferenceImageChange}

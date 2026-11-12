@@ -67,16 +67,19 @@ class ImageGenerationError(Exception):
         return error_dict
 
 
-def validate_image_request_parameters(model: str, options: dict[str, Any]) -> None:
+def validate_image_request_parameters(model: str, options: dict[str, Any]) -> dict[str, Any]:
     """统一图片 HTTP、工具和任务入口的网页原生参数校验。"""
     try:
-        validate_web_image_26_request_options(model, options)
+        normalized = validate_web_image_26_request_options(model, options)
+        if normalized.get("output_format") == "gif" and not config.image_web_gif_enabled:
+            raise ImageModelParameterError("网页 GIF 实验功能已关闭", "output_format")
         if is_web_image_26_model(model):
             validate_image_options(model, options.get("size"), options.get("quality") or "auto")
+        return normalized
     except ImageModelParameterError as exc:
         raise ImageGenerationError(
             str(exc), status_code=400, error_type="invalid_request_error",
-            code="invalid_parameter" if exc.param in {"size", "quality"} else "unsupported_parameter",
+            code=exc.code or ("invalid_parameter" if exc.param in {"size", "quality"} else "unsupported_parameter"),
             param=exc.param,
         ) from exc
 
@@ -170,10 +173,34 @@ def encode_images(images: Iterable[tuple[bytes, str, str]]) -> list[str]:
     return [base64.b64encode(data).decode("ascii") for data, _, _ in images if data]
 
 
-def encode_generated_image(payload: bytes, model: str) -> str:
+def validate_gif_reference_images(images: Iterable[bytes], *, param: str = "image") -> None:
+    """完整动画输入尚未验收，避免编辑或 mask 合成默默丢失时间维度。"""
+    for payload in images:
+        info = inspect_image(payload, verify=True)
+        if info is None and payload[:6] in {b"GIF87a", b"GIF89a"}:
+            raise ImageGenerationError(
+                "GIF 输入已损坏或无法完整解码，请使用完整的静态输入生成 GIF。",
+                status_code=400, error_type="invalid_request_error",
+                code="invalid_image", param=param,
+            )
+        if info is not None and info.animated:
+            raise ImageGenerationError(
+                "动画参考图或遮罩的完整编辑尚未验证，请使用静态输入生成 GIF。",
+                status_code=400, error_type="invalid_request_error",
+                code="unsupported_parameter", param=param,
+            )
+
+
+def encode_generated_image(payload: bytes, model: str, output_format: str | None = None) -> str:
     if is_web_image_26_model(model):
         info = inspect_image(payload, verify=True)
-        if info is None or not info.supported_static:
+        if output_format == "gif":
+            if info is None or not info.supported_animation:
+                raise ImageGenerationError(
+                    "上游未返回可完整解码的多帧动画 GIF；未重新提交生成请求。",
+                    code="animated_gif_not_generated",
+                )
+        elif info is None or not info.supported_static:
             raise ImageGenerationError(
                 "网页 Image 2.6 返回的格式尚不支持；当前只接收静态 PNG/JPEG/WebP",
                 code="unsupported_image_format",
@@ -181,8 +208,34 @@ def encode_generated_image(payload: bytes, model: str) -> str:
     return base64.b64encode(payload).decode("ascii")
 
 
+def encode_generated_images(
+    images: Iterable[bytes], model: str, output_format: str | None = None,
+) -> list[dict[str, str]]:
+    """网页动画可能伴随静态预览；按目标选取完整 GIF，保留原始字节。"""
+    payloads = list(images)
+    if is_web_image_26_model(model) and output_format == "gif":
+        payloads = [
+            payload for payload in payloads
+            if (info := inspect_image(payload, verify=True)) is not None and info.supported_animation
+        ]
+        if not payloads:
+            raise ImageGenerationError(
+                "上游未返回可完整解码的多帧动画 GIF；未重新提交生成请求。",
+                code="animated_gif_not_generated",
+            )
+        # 已完整验收，无需再逐帧解码一次。
+        return [{"b64_json": base64.b64encode(payload).decode("ascii")} for payload in payloads]
+    return [{"b64_json": encode_generated_image(payload, model, output_format)} for payload in payloads]
+
+
 def save_image_bytes(image_data: bytes, base_url: str | None = None) -> str:
     return image_storage_service.save(image_data, base_url).url
+
+
+def _image_poll_timeout_secs(output_format: str | None, *, minimum: int = 0) -> int:
+    """普通与补充轮询使用同一 GIF 预算，较长的已有图片超时设置同样生效。"""
+    gif_timeout = config.image_gif_poll_timeout_secs if output_format == "gif" else 0
+    return max(config.image_poll_timeout_secs, gif_timeout, minimum)
 
 
 def message_text(content: Any) -> str:
@@ -247,12 +300,21 @@ def assistant_history_messages(messages: list[dict[str, Any]]) -> list[str]:
     return [str(item.get("content") or "") for item in messages if item.get("role") == "assistant" and item.get("content")]
 
 
-def build_image_prompt(prompt: str, size: str | None, quality: str = "auto") -> str:
+def build_image_prompt(
+    prompt: str, size: str | None, quality: str = "auto", output_format: str | None = None,
+    frame_count: int | None = None, frame_duration_ms: int | None = None,
+) -> str:
     hints = []
     if size:
         hints.append(f"输出图片尺寸为 {size}。")
     if quality:
         hints.append(f"输出图片质量为 {quality}。")
+    if output_format == "gif":
+        hints.append("请生成并返回真实的多帧动画 GIF 文件，展示提示词中的连续运动并无缝循环；不要返回静态图片、单帧 GIF 或动画制作说明。")
+        if frame_count is not None:
+            hints.append(f"动画参考目标为 {frame_count} 帧。")
+        if frame_duration_ms is not None:
+            hints.append(f"每帧参考间隔为 {frame_duration_ms} 毫秒。")
     return f"{prompt.strip()}\n\n{''.join(hints)}" if hints else prompt
 
 
@@ -309,16 +371,21 @@ def format_image_result(
         if not b64_json:
             continue
         revised_prompt = str(item.get("revised_prompt") or prompt).strip() or prompt
+        payload = base64.b64decode(b64_json)
+        info = inspect_image(payload)
+        metadata = info.animation_metadata if info is not None else {}
         if response_format == "b64_json":
             data.append({
                 "b64_json": b64_json,
-                "url": save_image_bytes(base64.b64decode(b64_json), base_url),
+                "url": save_image_bytes(payload, base_url),
                 "revised_prompt": revised_prompt,
+                **metadata,
             })
         else:
             data.append({
-                "url": save_image_bytes(base64.b64decode(b64_json), base_url),
+                "url": save_image_bytes(payload, base_url),
                 "revised_prompt": revised_prompt,
+                **metadata,
             })
     result: dict[str, Any] = {"created": created or int(time.time()), "data": data}
     if message and not data:
@@ -337,11 +404,23 @@ class ConversationRequest:
     size: str | None = None
     quality: str = "auto"
     response_format: str = "b64_json"
+    output_format: str | None = None
+    frame_count: int | None = None
+    frame_duration_ms: int | None = None
     base_url: str | None = None
     message_as_error: bool = False
     progress_callback: Any = None  # Callable[[str], None] | None
 
     def __post_init__(self) -> None:
+        normalized = validate_image_request_parameters(self.model, {
+            "output_format": self.output_format, "frame_count": self.frame_count,
+            "frame_duration_ms": self.frame_duration_ms,
+        })
+        self.output_format = normalized.get("output_format")
+        self.frame_count = normalized.get("frame_count")
+        self.frame_duration_ms = normalized.get("frame_duration_ms")
+        if self.output_format == "gif" and self.images:
+            validate_gif_reference_images(base64.b64decode(image) for image in self.images)
         try:
             self.size, self.quality = validate_image_options(self.model, self.size, self.quality)
         except ImageModelParameterError as exc:
@@ -714,12 +793,17 @@ def conversation_events(
     size: str | None = None,
     quality: str = "auto",
     thinking_effort: str = "",
+    output_format: str | None = None,
+    frame_count: int | None = None,
+    frame_duration_ms: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     normalized = normalize_messages(messages or ([{"role": "user", "content": prompt}] if prompt else []))
     image_model = is_supported_image_model(model)
     history_text = "" if image_model else assistant_history_text(normalized)
     history_messages = [] if image_model else assistant_history_messages(normalized)
-    final_prompt = prompt_with_global_system(build_image_prompt(prompt, size, quality)) if image_model else prompt
+    final_prompt = prompt_with_global_system(build_image_prompt(
+        prompt, size, quality, output_format, frame_count, frame_duration_ms,
+    )) if image_model else prompt
     payloads = backend.stream_conversation(
         messages=normalized,
         model=model,
@@ -872,6 +956,9 @@ def stream_image_outputs(
                 images=request.images or [],
                 size=request.size,
                 quality=request.quality,
+                output_format=request.output_format,
+                frame_count=request.frame_count,
+                frame_duration_ms=request.frame_duration_ms,
         ):
             last = event
             if event.get("conversation_id"):
@@ -1000,7 +1087,7 @@ def stream_image_outputs(
     # 当检测到文本回复（含 referenced_image_ids）时，使用更长的超时来轮询图片结果。
     # 因为上游可能将图片生成作为异步任务执行，SSE 流在工具完成前就断开了，
     # 导致对话文档中尚未写入图片工具的响应记录。
-    poll_timeout = config.image_poll_timeout_secs
+    poll_timeout = _image_poll_timeout_secs(request.output_format)
     if is_text_reply and conversation_id:
         # 文本回复场景下图片可能仍在异步生成，使用更长超时（默认 120s → 额外 180s = 300s）
         poll_timeout = max(poll_timeout, 300)
@@ -1042,10 +1129,7 @@ def stream_image_outputs(
     if image_urls:
         if request.progress_callback:
             request.progress_callback("receiving_image")
-        image_items = [
-            {"b64_json": encode_generated_image(image_data, request.model)}
-            for image_data in backend.download_image_bytes(image_urls)
-        ]
+        image_items = encode_generated_images(backend.download_image_bytes(image_urls), request.model, request.output_format)
         data = format_image_result(
             image_items,
             request.prompt,
@@ -1089,7 +1173,7 @@ def stream_image_outputs(
             })
             # 文本回复场景下，图片可能需要 4-5 分钟才能异步生成完成。
             # 使用 300s 超时并允许多次重试，避免因临时网络问题提前退出。
-            retry_poll_timeout = max(config.image_poll_timeout_secs, 300)
+            retry_poll_timeout = _image_poll_timeout_secs(request.output_format, minimum=300)
             MAX_POLL_RETRIES = 3
             for poll_attempt in range(1, MAX_POLL_RETRIES + 1):
                 try:
@@ -1140,10 +1224,7 @@ def stream_image_outputs(
                 if image_urls:
                     if request.progress_callback:
                         request.progress_callback("receiving_image")
-                    image_items = [
-                        {"b64_json": encode_generated_image(image_data, request.model)}
-                        for image_data in backend.download_image_bytes(image_urls)
-                    ]
+                    image_items = encode_generated_images(backend.download_image_bytes(image_urls), request.model, request.output_format)
                     data = format_image_result(
                         image_items,
                         request.prompt,
@@ -1194,7 +1275,7 @@ def stream_image_outputs(
     if should_poll_for_image and conversation_id:
         # 图片可能仍在异步处理中（上游 SSE 流在图片生成完成前就结束了）。
         # 使用 300s 超时并允许多次重试，避免因临时网络问题或图片尚未提交而提前退出。
-        retry_poll_timeout = max(config.image_poll_timeout_secs, 300)
+        retry_poll_timeout = _image_poll_timeout_secs(request.output_format, minimum=300)
         MAX_FALLBACK_POLL_RETRIES = 3
         for poll_attempt in range(1, MAX_FALLBACK_POLL_RETRIES + 1):
             retry_wait_secs = min(30.0 * poll_attempt, config.image_poll_initial_wait_secs * poll_attempt)
@@ -1253,10 +1334,7 @@ def stream_image_outputs(
             if image_urls:
                 if request.progress_callback:
                     request.progress_callback("receiving_image")
-                image_items = [
-                    {"b64_json": encode_generated_image(image_data, request.model)}
-                    for image_data in backend.download_image_bytes(image_urls)
-                ]
+                image_items = encode_generated_images(backend.download_image_bytes(image_urls), request.model, request.output_format)
                 data = format_image_result(
                     image_items,
                     request.prompt,

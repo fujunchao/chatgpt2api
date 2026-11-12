@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ImageModel } from "@/lib/api";
-import { imageModelDescription, imageModelLabel, imageQualityOptions, isCodexImageModel } from "@/lib/image-models";
+import { imageModelDescription, imageModelLabel, imageQualityOptions, isCodexImageModel, isWebImage26Model, type ImageOutputFormat } from "@/lib/image-models";
 import { cn } from "@/lib/utils";
 
 type ImageComposerProps = {
@@ -20,6 +20,8 @@ type ImageComposerProps = {
   imageHeight: string;
   imageQuality: string;
   imageModel: ImageModel;
+  imageOutputFormat: ImageOutputFormat;
+  gifEnabled: boolean;
   imageModels: ImageModel[];
   availableQuota: string;
   activeTaskCount: number;
@@ -34,6 +36,7 @@ type ImageComposerProps = {
   onImageHeightChange: (value: string) => void;
   onImageQualityChange: (value: string) => void;
   onImageModelChange: (value: ImageModel) => void;
+  onImageOutputFormatChange: (value: ImageOutputFormat) => void;
   onSubmit: () => void | Promise<void>;
   onPickReferenceImage: () => void;
   onReferenceImageChange: (files: File[]) => void | Promise<void>;
@@ -84,6 +87,8 @@ export function ImageComposer({
   imageHeight,
   imageQuality,
   imageModel,
+  imageOutputFormat,
+  gifEnabled,
   imageModels,
   availableQuota,
   activeTaskCount,
@@ -98,6 +103,7 @@ export function ImageComposer({
   onImageHeightChange,
   onImageQualityChange,
   onImageModelChange,
+  onImageOutputFormatChange,
   onSubmit,
   onPickReferenceImage,
   onReferenceImageChange,
@@ -121,9 +127,10 @@ export function ImageComposer({
   const qualityOptions = imageQualityOptions(imageModel);
   const qualityLabel = qualityOptions.find((option) => option.value === imageQuality)?.label || "自动";
   const ratioLabel = imageRatio === "auto" ? "auto" : `${imageRatio}(${imageTier})`;
-  const imageSizeLabel = `${qualityLabel} · ${ratioLabel} · ${imageCount || 1} 张`;
+  const imageSizeLabel = `${imageOutputFormat === "gif" ? "GIF · " : ""}${qualityLabel} · ${ratioLabel} · ${imageCount || 1} 张`;
   const selectedModelLabel = modelOptions.find((option) => option.value === imageModel)?.label || imageModel;
   const isCodexModel = isCodexImageModel(imageModel);
+  const supportsGif = isWebImage26Model(imageModel);
   const modelDescription = imageModelDescription(imageModel);
 
   useEffect(() => {
@@ -280,7 +287,9 @@ export function ImageComposer({
               onChange={(event) => onPromptChange(event.target.value)}
               onPaste={handleTextareaPaste}
               placeholder={
-                referenceImages.length > 0
+                imageOutputFormat === "gif"
+                  ? "描述主体如何运动及循环，例如：小球不断弹跳，首尾自然衔接"
+                  : referenceImages.length > 0
                   ? "描述你希望如何修改参考图"
                   : "输入你想要生成的画面，也可直接粘贴图片"
               }
@@ -394,6 +403,29 @@ export function ImageComposer({
                               {modelDescription}
                             </p>
                           ) : null}
+                        </div>
+                        <div className="mb-3">
+                          <div className="mb-2 text-sm font-medium text-stone-900" id="image-output-format-label">输出格式</div>
+                          <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="image-output-format-label">
+                            {([{ value: "png", label: "静态图片" }, { value: "gif", label: "GIF（实验）" }] as const).map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                disabled={option.value === "gif" && (!supportsGif || !gifEnabled)}
+                                aria-pressed={imageOutputFormat === option.value}
+                                className={cn(
+                                  "h-9 cursor-pointer rounded-full border border-stone-200 bg-white text-sm text-stone-800 transition hover:border-stone-300 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300",
+                                  imageOutputFormat === option.value && "border-stone-950 font-medium text-stone-950",
+                                )}
+                                onClick={() => onImageOutputFormatChange(option.value)}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="mt-2 text-xs leading-relaxed text-stone-500" role="note">
+                            {!supportsGif ? "GIF 仅适用于网页 2.6 模型。" : !gifEnabled ? "GIF 实验功能当前未启用。" : imageOutputFormat === "gif" ? "请描述运动和循环。实际帧数和时长以上游返回为准；静态参考图可用于动画化。" : "GIF 实验功能可生成循环动画。"}
+                          </p>
                         </div>
                         <div className="mb-3">
                           <div className="mb-2 text-sm font-medium text-stone-900">质量</div>

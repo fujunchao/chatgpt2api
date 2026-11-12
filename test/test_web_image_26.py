@@ -17,7 +17,7 @@ from services.image_task_service import ImageTaskService
 from test.test_free_web_image import HEADERS, FixtureResponse, FixtureSession, WebImageFixture
 
 
-class WebImage26Tests(WebImageFixture):
+class WebImageResumeFixture(WebImageFixture):
     def enable_resume_poll_fixture(self):
         self.enable_fixture_upstream()
 
@@ -58,6 +58,8 @@ class WebImage26Tests(WebImageFixture):
             time.sleep(0.02)
         self.fail(f"任务未在测试时限内完成：{task}")
 
+
+class WebImage26Tests(WebImageResumeFixture):
     def test_resume_poll_uses_original_web_account_and_marks_unknown_usage(self):
         self.enable_resume_poll_fixture()
         timeout = backend_module.ImagePollTimeoutError("ChatGPT 生图超时")
@@ -325,7 +327,7 @@ class WebImage26Tests(WebImageFixture):
 
     def test_native_controls_are_rejected_before_a_web_request(self):
         self.enable_fixture_upstream()
-        for param, value in (("complexity", "high"), ("output_format", "gif"), ("frame_count", 9), ("quality", "max")):
+        for param, value in (("complexity", "high"), ("output_format", "jpeg"), ("frame_count", 9), ("quality", "max")):
             with self.subTest(param=param):
                 self.accounts.update_account("fixture-web-free", {"quota": 1, "status": "正常"})
                 self.requests.clear()
@@ -426,7 +428,7 @@ class WebImage26Tests(WebImageFixture):
                     self.requests.clear()
                     response = self.client.post("/v1/responses", headers=HEADERS, json={
                         "model": model, "input": "fixture", "tools": [tool],
-                        "stream": stream, "output_format": "gif",
+                        "stream": stream, "output_format": "jpeg",
                     })
                     self.assertEqual(response.status_code, 400, response.text)
                     self.assertEqual(response.json()["error"]["param"], "output_format")

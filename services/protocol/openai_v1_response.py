@@ -248,6 +248,7 @@ def image_output_items(prompt: str, data: list[dict[str, Any]], item_id: str | N
                 "status": "completed",
                 "result": b64_json,
                 "revised_prompt": str(item.get("revised_prompt") or prompt).strip() or prompt,
+                **({"output_format": "gif", "mime_type": "image/gif", "frame_count": item["frame_count"]} if item.get("format") == "gif" else {}),
             })
     return output
 
@@ -452,17 +453,20 @@ def response_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
         (data, f"image_{index}.png", mime) for index, (data, mime) in enumerate(image_inputs, start=1)
     ]) or None
     input_image_tokens = count_image_content_tokens(parts, image_model)
+    options = response_image_options(body, tool)
+    image_options = validate_image_request_parameters(image_model, options)
     image_outputs = stream_image_outputs_with_pool(ConversationRequest(
         prompt=prompt,
         model=image_model,
-        size=tool.get("size"),
-        quality=str(tool.get("quality") or "auto"),
+        size=options.get("size"),
+        quality=str(options.get("quality") or "auto"),
         response_format="b64_json",
+        **image_options,
         images=images,
     ))
     yield from stream_image_response(
         image_outputs, prompt, model, input_image_tokens,
-        tool.get("size"), str(tool.get("quality") or "auto"), image_model=image_model,
+        options.get("size"), str(options.get("quality") or "auto"), image_model=image_model,
     )
 
 
@@ -474,12 +478,29 @@ def response_image_model(body: dict[str, Any], tool: dict[str, Any]) -> str:
     )
 
 
+def response_image_options(body: dict[str, Any], tool: dict[str, Any]) -> dict[str, Any]:
+    """工具选项覆盖顶层提示；PNG 兼容默认值不会覆盖已选择的 GIF。"""
+    options = {**body, **{name: value for name, value in tool.items() if value is not None}}
+    if (
+        str(body.get("output_format") or "").strip().lower() == "gif"
+        and str(tool.get("output_format") or "").strip().lower() == "png"
+    ):
+        options["output_format"] = "gif"
+    return options
+
+
 def handle(body: dict[str, Any]) -> dict[str, Any] | Iterator[dict[str, Any]]:
     if has_response_image_generation_tool(body):
         tool = response_image_tool(body)
         image_model = response_image_model(body, tool)
-        validate_image_request_parameters(image_model, body)
-        validate_image_request_parameters(image_model, tool)
+        options = response_image_options(body, tool)
+        # 分别保留每一层的未支持选项，避免工具覆盖值让顶层非法字段被忽略。
+        for scope in (body, tool):
+            scoped = {**scope}
+            if scope.get("output_format") is None or str(scope.get("output_format")).strip().lower() in {"png", "gif"}:
+                scoped["output_format"] = options.get("output_format")
+            validate_image_request_parameters(image_model, scoped)
+        validate_image_request_parameters(image_model, options)
     events = response_events(body)
     if body.get("stream"):
         return events

@@ -9,7 +9,7 @@ from unittest import mock
 
 from PIL import Image
 
-from services.image_storage_service import ImageStorageService
+from services.image_storage_service import ImageStorageError, ImageStorageService
 from services import image_service
 
 
@@ -81,6 +81,12 @@ class ImageStorageServiceTests(unittest.TestCase):
         self.assertEqual(stored.storage, "local")
         self.assertTrue((self.images_dir / stored.rel).is_file())
         self.assertEqual(stored.url, f"http://app.test/images/{stored.rel}")
+
+    def test_broken_gif_is_rejected_instead_of_being_saved_as_png(self):
+        service = self.service()
+        with self.assertRaises(ImageStorageError):
+            service.save(b"GIF89a\x10\x00", "http://app.test")
+        self.assertEqual(service.list_items("http://app.test"), [])
 
     def test_static_formats_keep_original_bytes_extension_and_webdav_type(self):
         self.settings.update({"enabled": True, "mode": "both", "webdav_url": "https://dav.example.test"})

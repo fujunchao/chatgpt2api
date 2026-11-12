@@ -1,3 +1,5 @@
+export type ImageOutputFormat = "png" | "gif";
+
 /** 与后端保持一致：裸 2.5 是 Web 自动入口，带变体的裸名称仍走 Codex。 */
 export function isWebAutoImageModel(model: string): boolean {
   return model.trim().toLowerCase() === "gpt-image-2.5";
@@ -6,6 +8,11 @@ export function isWebAutoImageModel(model: string): boolean {
 /** 2.6 三个请求名称均使用网页账号，不能归入旧的 Codex 2.5 选项。 */
 export function isWebImage26Model(model: string): boolean {
   return /^gpt-image-2\.6(?:-(?:flare|sunburst))?$/.test(model.trim().toLowerCase());
+}
+
+/** 编辑器切换模型时复位格式；已提交任务应继续使用历史中的原目标。 */
+export function normalizeImageOutputFormat(model: string, format: string | null | undefined): ImageOutputFormat {
+  return isWebImage26Model(model) && format === "gif" ? "gif" : "png";
 }
 
 /** 此谓词只识别 Codex 2.5 请求选项，不代表上游已确认图片引擎身份。 */

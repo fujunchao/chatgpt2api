@@ -53,9 +53,10 @@ WEB_IMAGE_26_NATIVE_OPTIONS = (
 
 
 class ImageModelParameterError(ValueError):
-    def __init__(self, message: str, param: str):
+    def __init__(self, message: str, param: str, *, code: str | None = None):
         super().__init__(message)
         self.param = param
+        self.code = code
 
 
 def split_image_model(model: object) -> tuple[str | None, str | None]:
@@ -102,17 +103,36 @@ def image_model_qualities(model: object) -> tuple[str, ...]:
     return IMAGE_25_QUALITIES if is_gpt_image_25_model(model) else IMAGE_QUALITIES
 
 
-def validate_web_image_26_request_options(model: object, options: Mapping[str, object]) -> None:
-    """允许客户端默认 PNG；其余未接通的网页原生控制在入口明确拒绝。"""
+def validate_web_image_26_request_options(model: object, options: Mapping[str, object]) -> dict[str, object]:
+    """规范化本地输出目标；网页原生控制仍在入口明确拒绝。"""
     if not is_web_image_26_model(model):
-        return
+        if str(options.get("output_format") or "").strip().lower() == "gif":
+            raise ImageModelParameterError("实验 GIF 生成只支持网页 Image 2.6 模型", "output_format")
+        return {}
+    normalized: dict[str, object] = {}
+    gif_requested = str(options.get("output_format") or "").strip().lower() == "gif"
     for name in WEB_IMAGE_26_NATIVE_OPTIONS:
         value = options.get(name)
-        # CVA 等 OpenAI 图片客户端固定传 PNG，仅作为兼容默认值，不传给网页协议。
-        if name == "output_format" and isinstance(value, str) and value.strip().lower() == "png":
+        # PNG 是客户端兼容默认值，GIF 是本地验收目标；两者均不透传网页协议。
+        if name == "output_format" and isinstance(value, str) and value.strip().lower() in {"png", "gif"}:
+            normalized[name] = value.strip().lower()
+            continue
+        if gif_requested and name in {"frame_count", "frame_duration_ms"} and value is not None:
+            lower, upper = (2, 16) if name == "frame_count" else (20, 2000)
+            if (
+                isinstance(value, bool) or not isinstance(value, (int, str))
+                or not re.fullmatch(r"[0-9]+", str(value).strip())
+                or not lower <= int(str(value).strip()) <= upper
+            ):
+                raise ImageModelParameterError(
+                    f"GIF 提示参数 {name} 须为 {lower}–{upper} 之间的整数", name,
+                    code="invalid_parameter",
+                )
+            normalized[name] = int(str(value).strip())
             continue
         if value is not None:
             raise ImageModelParameterError(f"网页 Image 2.6 尚不支持原生参数 {name}", name)
+    return normalized
 
 
 def validate_image_options(model: object, size: object, quality: object) -> tuple[object, str]:

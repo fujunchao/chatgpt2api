@@ -1,0 +1,43 @@
+{
+  "probe_scope": "synthetic local payloads only; no provider requests",
+  "gif": {
+    "format": "GIF",
+    "extension": ".gif",
+    "mime": "image/gif",
+    "animated": true,
+    "supported_static": false,
+    "frame_count": 2,
+    "durations": [
+      200,
+      300
+    ]
+  },
+  "request_gate": {
+    "rejected": true,
+    "param": "output_format"
+  },
+  "result_gate": {
+    "rejected": true,
+    "code": "unsupported_image_format",
+    "status_code": 502
+  },
+  "gif_generated_path_suffix": ".png",
+  "gif_extension_whitelisted": false,
+  "storage_gate": {
+    "rejected": true,
+    "writes_before_reject": 0
+  },
+  "png_baseline": {
+    "extension": ".png",
+    "original_bytes_kept": true
+  },
+  "animation_compression": {
+    "original_bytes_kept": true
+  },
+  "poster_thumbnail": {
+    "format": "PNG",
+    "frame_count": 1,
+    "original_gif_kept": true
+  },
+  "misnamed_local_preview_mime": "image/png"
+}

@@ -63,7 +63,7 @@ def _parse_count(value: object) -> int:
 
 def _payload_from_fields(fields: dict[str, Any]) -> dict[str, Any]:
     """构造图片编辑载荷：从表单或 JSON 字段提取通用参数。"""
-    validate_image_request_parameters(str(fields.get("model") or "gpt-image-2"), fields)
+    image_options = validate_image_request_parameters(str(fields.get("model") or "gpt-image-2"), fields)
     prompt = _clean(fields.get("prompt"))
     if not prompt:
         raise HTTPException(status_code=400, detail={"error": "prompt is required"})
@@ -75,6 +75,7 @@ def _payload_from_fields(fields: dict[str, Any]) -> dict[str, Any]:
         "quality": _clean(fields.get("quality"), "auto"),
         "response_format": _clean(fields.get("response_format"), "b64_json"),
         "stream": _parse_bool(fields.get("stream")),
+        **image_options,
     }
     if "client_task_id" in fields:
         payload["client_task_id"] = _clean(fields.get("client_task_id"))

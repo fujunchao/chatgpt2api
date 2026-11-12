@@ -2,7 +2,8 @@
 
 import localforage from "localforage";
 
-import type { ImageModel } from "@/lib/api";
+import type { ImageModel, ImageResultData } from "@/lib/api";
+import type { ImageOutputFormat } from "@/lib/image-models";
 
 export type ImageConversationMode = "generate" | "edit";
 
@@ -12,7 +13,7 @@ export type StoredReferenceImage = {
   dataUrl: string;
 };
 
-export type StoredImage = {
+export type StoredImage = ImageResultData & {
   id: string;
   taskId?: string;
   status?: "loading" | "success" | "error";
@@ -41,6 +42,9 @@ export type ImageTurn = {
   ratio: string;
   tier: string;
   quality: string;
+  outputFormat?: ImageOutputFormat;
+  frameCount?: number;
+  frameDurationMs?: number;
   images: StoredImage[];
   createdAt: string;
   status: ImageTurnStatus;
@@ -153,6 +157,10 @@ function normalizeTurn(turn: ImageTurn & Record<string, unknown>): ImageTurn {
     ratio: typeof turn.ratio === "string" && turn.ratio ? turn.ratio : "1:1",
     tier: typeof turn.tier === "string" && turn.tier ? turn.tier : "1k",
     quality: typeof turn.quality === "string" && turn.quality ? turn.quality : "auto",
+    // 保留已提交任务的原目标，模型或实验开关变化不能把恢复中的 GIF 改成静态图片。
+    outputFormat: turn.outputFormat === "gif" ? "gif" : "png",
+    frameCount: typeof turn.frameCount === "number" ? turn.frameCount : undefined,
+    frameDurationMs: typeof turn.frameDurationMs === "number" ? turn.frameDurationMs : undefined,
     images: normalizedImages,
     createdAt: String(turn.createdAt || new Date().toISOString()),
     status:

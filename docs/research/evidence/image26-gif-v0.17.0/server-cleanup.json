@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-12",
+  "temporary_validation_directories": 2,
+  "credentials_logs_caches_removed": true,
+  "reports_retained": 2,
+  "original_result_images_retained": [7, 9],
+  "production_version": "0.16.5",
+  "production_unchanged": true,
+  "production_container_identity_unchanged": true,
+  "production_start_time_unchanged": true,
+  "production_restart_count_unchanged": true
+}

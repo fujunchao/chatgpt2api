@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from api.image_inputs import parse_image_edit_request, read_image_sources
 from api.support import require_identity, resolve_image_base_url
 from services.content_filter import check_request
+from services.config import config
 from services.image_task_service import image_task_service
 from services.log_service import LoggedCall
 from services.protocol.conversation import validate_image_request_parameters
@@ -40,6 +41,14 @@ async def filter_or_log(call: LoggedCall, text: str) -> None:
 def create_router() -> APIRouter:
     router = APIRouter()
 
+    @router.get("/api/image-capabilities")
+    async def image_capabilities(authorization: str | None = Header(default=None)):
+        require_identity(authorization)
+        return {
+            "web_gif_enabled": config.image_web_gif_enabled,
+            "gif_poll_timeout_secs": config.image_gif_poll_timeout_secs,
+        }
+
     @router.get("/api/image-tasks")
     async def list_image_tasks(
         ids: str = Query(default=""),
@@ -55,7 +64,7 @@ def create_router() -> APIRouter:
         authorization: str | None = Header(default=None),
     ):
         identity = require_identity(authorization)
-        validate_image_request_parameters(body.model, body.model_dump(mode="python"))
+        image_options = validate_image_request_parameters(body.model, body.model_dump(mode="python"))
         await filter_or_log(LoggedCall(identity, "/api/image-tasks/generations", body.model, "文生图任务", request_text=body.prompt), body.prompt)
         try:
             return await run_in_threadpool(
@@ -66,6 +75,7 @@ def create_router() -> APIRouter:
                 model=body.model,
                 size=body.size,
                 quality=body.quality,
+                **image_options,
                 base_url=resolve_image_base_url(request),
             )
         except ValueError as exc:
@@ -95,6 +105,7 @@ def create_router() -> APIRouter:
                 model=model,
                 size=payload["size"],
                 quality=payload["quality"],
+                **{name: payload[name] for name in ("output_format", "frame_count", "frame_duration_ms") if name in payload},
                 base_url=resolve_image_base_url(request),
                 images=images,
                 masks=masks,

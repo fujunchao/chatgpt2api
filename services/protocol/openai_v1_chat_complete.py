@@ -231,6 +231,7 @@ def image_result_content(result: dict[str, Any]) -> str:
 
 def image_chat_response(body: dict[str, Any]) -> dict[str, Any]:
     model, prompt, n, images = chat_image_args(body)
+    image_options = validate_image_request_parameters(model, body)
     result = collect_image_outputs(stream_image_outputs_with_pool(ConversationRequest(
         prompt=prompt,
         model=model,
@@ -238,6 +239,7 @@ def image_chat_response(body: dict[str, Any]) -> dict[str, Any]:
         size=body.get("size"),
         quality=str(body.get("quality") or "auto"),
         response_format="b64_json",
+        **image_options,
         images=encode_images(images) or None,
     )))
     response = completion_response(model, image_result_content(result), int(result.get("created") or 0) or None)
@@ -257,6 +259,7 @@ def image_chat_response(body: dict[str, Any]) -> dict[str, Any]:
 
 def image_chat_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
     model, prompt, n, images = chat_image_args(body)
+    image_options = validate_image_request_parameters(model, body)
     image_outputs = stream_image_outputs_with_pool(ConversationRequest(
         prompt=prompt,
         model=model,
@@ -264,6 +267,7 @@ def image_chat_events(body: dict[str, Any]) -> Iterator[dict[str, Any]]:
         size=body.get("size"),
         quality=str(body.get("quality") or "auto"),
         response_format="b64_json",
+        **image_options,
         images=encode_images(images) or None,
     ))
     yield from stream_image_chat_completion(image_outputs, model)

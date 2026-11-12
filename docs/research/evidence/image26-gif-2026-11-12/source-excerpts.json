@@ -1,0 +1,659 @@
+[
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "utils/helper.py",
+    "start": 20,
+    "end": 38,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/utils/helper.py#L20-L38",
+    "text": "20: DEFAULT_WEB_IMAGE_MODELS = {\n21:     \"gpt-image-2.6-sunburst\",\n22:     \"gpt-image-2.6-flare\",\n23:     \"gpt-image-2.5-sunburst\",\n24:     \"gpt-image-2.5-flare\",\n25:     \"gpt-image-2\",\n26:     \"gpt-5-5-thinking\",\n27:     \"gpt-5-5\",\n28:     \"gpt-5-3\",\n29: }\n30: IMAGE_MODEL_PLAN_TYPES = (\"plus\", \"team\", \"pro\")\n31: CODEX_IMAGE_MODEL = \"codex-gpt-image-2\"\n32: BASE_IMAGE_MODELS = DEFAULT_WEB_IMAGE_MODELS | {CODEX_IMAGE_MODEL}\n33: PREFIXED_CODEX_IMAGE_MODELS = {\n34:     f\"{plan_type}-{CODEX_IMAGE_MODEL}\"\n35:     for plan_type in IMAGE_MODEL_PLAN_TYPES\n36: }\n37: IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS\n38: PUBLIC_IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/openai_backend_api.py",
+    "start": 693,
+    "end": 703,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/openai_backend_api.py#L693-L703",
+    "text": "693:     def _image_model_slug(self, model: str) -> str:\n694:         \"\"\"把标准图片模型名映射到底层 model slug。\"\"\"\n695:         _, base_model = split_image_model(model)\n696:         if not base_model:\n697:             return \"auto\"\n698:         if base_model == \"gpt-image-2\":\n699:             return \"gpt-5-5-thinking\"\n700:         if base_model == CODEX_IMAGE_MODEL:\n701:             return base_model\n702:         return base_model\n703: "
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/openai_backend_api.py",
+    "start": 1017,
+    "end": 1032,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/openai_backend_api.py#L1017-L1032",
+    "text": "1017:         path = \"/backend-api/f/conversation/prepare\"\n1018:         payload = {\n1019:             \"action\": \"next\",\n1020:             \"fork_from_shared_post\": False,\n1021:             \"parent_message_id\": new_uuid(),\n1022:             \"model\": self._image_model_slug(model),\n1023:             \"client_prepare_state\": \"success\",\n1024:             \"timezone_offset_min\": -480,\n1025:             \"timezone\": \"Asia/Shanghai\",\n1026:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1027:             \"system_hints\": [\"picture_v2\"],\n1028:             \"partial_query\": {\n1029:                 \"id\": new_uuid(),\n1030:                 \"author\": {\"role\": \"user\"},\n1031:                 \"content\": {\"content_type\": \"text\", \"parts\": [prompt]},\n1032:             },"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/openai_backend_api.py",
+    "start": 1158,
+    "end": 1170,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/openai_backend_api.py#L1158-L1170",
+    "text": "1158:             }],\n1159:             \"parent_message_id\": new_uuid(),\n1160:             \"model\": self._image_model_slug(model),\n1161:             \"client_prepare_state\": \"sent\",\n1162:             \"timezone_offset_min\": -480,\n1163:             \"timezone\": \"Asia/Shanghai\",\n1164:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1165:             \"enable_message_followups\": True,\n1166:             \"system_hints\": [\"picture_v2\"],\n1167:             \"supports_buffering\": True,\n1168:             \"supported_encodings\": [\"v1\"],\n1169:             \"client_contextual_info\": {\n1170:                 \"is_dark_mode\": False,"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "test/test_multi_image_results.py",
+    "start": 270,
+    "end": 294,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/test/test_multi_image_results.py#L270-L294",
+    "text": "270:     def test_image_26_requests_preserve_model_with_legacy_cache(self) -> None:\n271:         backend = OpenAIBackendAPI.__new__(OpenAIBackendAPI)\n272:         backend.base_url = \"https://chatgpt.test\"\n273:         backend.session = mock.Mock()\n274:         backend.session.post.return_value.status_code = 200\n275:         backend.session.post.return_value.json.return_value = {\"conduit_token\": \"conduit\"}\n276:         backend._image_headers = mock.Mock(return_value={})\n277:         requirements = mock.Mock(token=\"token\", proof_token=\"\", turnstile_token=\"\", so_token=\"\")\n278:         reference = {\n279:             \"file_id\": \"file-1\", \"file_name\": \"image.png\", \"file_size\": 100,\n280:             \"mime_type\": \"image/png\", \"width\": 64, \"height\": 64,\n281:         }\n282: \n283:         with mock.patch.dict(config.data, {\"image_models_cache\": [\"gpt-image-2\"]}):\n284:             for model in (\"gpt-image-2.6-flare\", \"gpt-image-2.6-sunburst\"):\n285:                 with self.subTest(model=model):\n286:                     backend._prepare_image_conversation(\"draw\", requirements, model)\n287:                     self.assertEqual(backend.session.post.call_args.kwargs[\"json\"][\"model\"], model)\n288: \n289:                     for references in ([], [reference]):\n290:                         backend._start_image_generation(\"draw\", requirements, \"conduit\", model, references)\n291:                         payload = backend.session.post.call_args.kwargs[\"json\"]\n292:                         self.assertEqual(payload[\"model\"], model)\n293:                         content = payload[\"messages\"][0][\"content\"]\n294:                         self.assertEqual(content[\"content_type\"], \"multimodal_text\" if references else \"text\")"
+  },
+  {
+    "repo": "mxw13579/chatgpt2api",
+    "sha": "d3fa3571eb045f2f9e83a1a22f755dfe373ea026",
+    "path": "utils/helper.py",
+    "start": 20,
+    "end": 38,
+    "url": "https://github.com/mxw13579/chatgpt2api/blob/d3fa3571eb045f2f9e83a1a22f755dfe373ea026/utils/helper.py#L20-L38",
+    "text": "20: DEFAULT_WEB_IMAGE_MODELS = {\n21:     \"gpt-image-2.6-sunburst\",\n22:     \"gpt-image-2.6-flare\",\n23:     \"gpt-image-2.5-sunburst\",\n24:     \"gpt-image-2.5-flare\",\n25:     \"gpt-image-2\",\n26:     \"gpt-5-5-thinking\",\n27:     \"gpt-5-5\",\n28:     \"gpt-5-3\",\n29: }\n30: IMAGE_MODEL_PLAN_TYPES = (\"plus\", \"team\", \"pro\")\n31: CODEX_IMAGE_MODEL = \"codex-gpt-image-2\"\n32: BASE_IMAGE_MODELS = DEFAULT_WEB_IMAGE_MODELS | {CODEX_IMAGE_MODEL}\n33: PREFIXED_CODEX_IMAGE_MODELS = {\n34:     f\"{plan_type}-{CODEX_IMAGE_MODEL}\"\n35:     for plan_type in IMAGE_MODEL_PLAN_TYPES\n36: }\n37: IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS\n38: PUBLIC_IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS"
+  },
+  {
+    "repo": "mxw13579/chatgpt2api",
+    "sha": "d3fa3571eb045f2f9e83a1a22f755dfe373ea026",
+    "path": "services/openai_backend_api.py",
+    "start": 694,
+    "end": 703,
+    "url": "https://github.com/mxw13579/chatgpt2api/blob/d3fa3571eb045f2f9e83a1a22f755dfe373ea026/services/openai_backend_api.py#L694-L703",
+    "text": "694:     def _image_model_slug(self, model: str) -> str:\n695:         \"\"\"把标准图片模型名映射到底层 model slug。\"\"\"\n696:         _, base_model = split_image_model(model)\n697:         if not base_model:\n698:             return \"auto\"\n699:         if base_model == \"gpt-image-2\":\n700:             return config.default_upstream_model_name or \"gpt-5-5-thinking\"\n701:         if base_model == CODEX_IMAGE_MODEL:\n702:             return base_model\n703:         return base_model"
+  },
+  {
+    "repo": "mxw13579/chatgpt2api",
+    "sha": "d3fa3571eb045f2f9e83a1a22f755dfe373ea026",
+    "path": "services/openai_backend_api.py",
+    "start": 1005,
+    "end": 1015,
+    "url": "https://github.com/mxw13579/chatgpt2api/blob/d3fa3571eb045f2f9e83a1a22f755dfe373ea026/services/openai_backend_api.py#L1005-L1015",
+    "text": "1005:         path = \"/backend-api/f/conversation/prepare\"\n1006:         payload = {\n1007:             \"action\": \"next\",\n1008:             \"fork_from_shared_post\": False,\n1009:             \"parent_message_id\": new_uuid(),\n1010:             \"model\": self._image_model_slug(model),\n1011:             \"client_prepare_state\": \"success\",\n1012:             \"timezone_offset_min\": -480,\n1013:             \"timezone\": \"Asia/Shanghai\",\n1014:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1015:             \"system_hints\": [\"picture_v2\"],"
+  },
+  {
+    "repo": "mxw13579/chatgpt2api",
+    "sha": "d3fa3571eb045f2f9e83a1a22f755dfe373ea026",
+    "path": "services/openai_backend_api.py",
+    "start": 1146,
+    "end": 1156,
+    "url": "https://github.com/mxw13579/chatgpt2api/blob/d3fa3571eb045f2f9e83a1a22f755dfe373ea026/services/openai_backend_api.py#L1146-L1156",
+    "text": "1146:             }],\n1147:             \"parent_message_id\": new_uuid(),\n1148:             \"model\": self._image_model_slug(model),\n1149:             \"client_prepare_state\": \"sent\",\n1150:             \"timezone_offset_min\": -480,\n1151:             \"timezone\": \"Asia/Shanghai\",\n1152:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1153:             \"enable_message_followups\": True,\n1154:             \"system_hints\": [\"picture_v2\"],\n1155:             \"supports_buffering\": True,\n1156:             \"supported_encodings\": [\"v1\"],"
+  },
+  {
+    "repo": "mxw13579/chatgpt2api",
+    "sha": "d3fa3571eb045f2f9e83a1a22f755dfe373ea026",
+    "path": "test/test_multi_image_results.py",
+    "start": 270,
+    "end": 294,
+    "url": "https://github.com/mxw13579/chatgpt2api/blob/d3fa3571eb045f2f9e83a1a22f755dfe373ea026/test/test_multi_image_results.py#L270-L294",
+    "text": "270:     def test_image_26_requests_preserve_model_with_legacy_cache(self) -> None:\n271:         backend = OpenAIBackendAPI.__new__(OpenAIBackendAPI)\n272:         backend.base_url = \"https://chatgpt.test\"\n273:         backend.session = mock.Mock()\n274:         backend.session.post.return_value.status_code = 200\n275:         backend.session.post.return_value.json.return_value = {\"conduit_token\": \"conduit\"}\n276:         backend._image_headers = mock.Mock(return_value={})\n277:         requirements = mock.Mock(token=\"token\", proof_token=\"\", turnstile_token=\"\", so_token=\"\")\n278:         reference = {\n279:             \"file_id\": \"file-1\", \"file_name\": \"image.png\", \"file_size\": 100,\n280:             \"mime_type\": \"image/png\", \"width\": 64, \"height\": 64,\n281:         }\n282: \n283:         with mock.patch.dict(config.data, {\"image_models_cache\": [\"gpt-image-2\"]}):\n284:             for model in (\"gpt-image-2.6-flare\", \"gpt-image-2.6-sunburst\"):\n285:                 with self.subTest(model=model):\n286:                     backend._prepare_image_conversation(\"draw\", requirements, model)\n287:                     self.assertEqual(backend.session.post.call_args.kwargs[\"json\"][\"model\"], model)\n288: \n289:                     for references in ([], [reference]):\n290:                         backend._start_image_generation(\"draw\", requirements, \"conduit\", model, references)\n291:                         payload = backend.session.post.call_args.kwargs[\"json\"]\n292:                         self.assertEqual(payload[\"model\"], model)\n293:                         content = payload[\"messages\"][0][\"content\"]\n294:                         self.assertEqual(content[\"content_type\"], \"multimodal_text\" if references else \"text\")"
+  },
+  {
+    "repo": "lc2022560478/chatgpt2api",
+    "sha": "17f7ef18498055ebccb280f9ca065be1fce817ed",
+    "path": "utils/helper.py",
+    "start": 17,
+    "end": 27,
+    "url": "https://github.com/lc2022560478/chatgpt2api/blob/17f7ef18498055ebccb280f9ca065be1fce817ed/utils/helper.py#L17-L27",
+    "text": "17: IMAGE_25_FLARE_MODEL = \"gpt-image-2.5-flare\"\n18: IMAGE_25_SUNBURST_MODEL = \"gpt-image-2.5-sunburst\"\n19: IMAGE_26_FLARE_MODEL = \"gpt-image-2.6-flare\"\n20: IMAGE_26_SUNBURST_MODEL = \"gpt-image-2.6-sunburst\"\n21: BASE_IMAGE_MODELS = {\n22:     \"gpt-image-2\",\n23:     IMAGE_25_FLARE_MODEL,\n24:     IMAGE_25_SUNBURST_MODEL,\n25:     IMAGE_26_FLARE_MODEL,\n26:     IMAGE_26_SUNBURST_MODEL,\n27:     \"codex-gpt-image-2\","
+  },
+  {
+    "repo": "lc2022560478/chatgpt2api",
+    "sha": "17f7ef18498055ebccb280f9ca065be1fce817ed",
+    "path": "services/openai_backend_api.py",
+    "start": 624,
+    "end": 645,
+    "url": "https://github.com/lc2022560478/chatgpt2api/blob/17f7ef18498055ebccb280f9ca065be1fce817ed/services/openai_backend_api.py#L624-L645",
+    "text": "624:     def _image_model_settings(self, model: str) -> tuple[str, str]:\n625:         \"\"\"把标准图片模型名映射为上游模型及思考强度。\"\"\"\n626:         _, base_model = split_image_model(model)\n627:         if not base_model:\n628:             return \"auto\", \"\"\n629:         if base_model == \"gpt-image-2\":\n630:             upstream_model = config.default_upstream_model_name\n631:         elif base_model in {\n632:             IMAGE_25_FLARE_MODEL,\n633:             IMAGE_25_SUNBURST_MODEL,\n634:             IMAGE_26_FLARE_MODEL,\n635:             IMAGE_26_SUNBURST_MODEL,\n636:         }:\n637:             upstream_model = base_model\n638:         elif base_model == CODEX_IMAGE_MODEL:\n639:             upstream_model = base_model\n640:         else:\n641:             return \"auto\", \"\"\n642:         model_name, separator, suffix = upstream_model.rpartition(\"-\")\n643:         if separator and suffix.lower() in {\"standard\", \"extended\", \"max\"}:\n644:             return model_name, suffix.lower()\n645:         return upstream_model, self._normalize_thinking_effort(config.default_thinking_effort)"
+  },
+  {
+    "repo": "lc2022560478/chatgpt2api",
+    "sha": "17f7ef18498055ebccb280f9ca065be1fce817ed",
+    "path": "services/openai_backend_api.py",
+    "start": 939,
+    "end": 953,
+    "url": "https://github.com/lc2022560478/chatgpt2api/blob/17f7ef18498055ebccb280f9ca065be1fce817ed/services/openai_backend_api.py#L939-L953",
+    "text": "939:         \"\"\"为图片生成准备 conduit token。\"\"\"\n940:         path = \"/backend-api/f/conversation/prepare\"\n941:         upstream_model, thinking_effort = self._image_model_settings(model)\n942:         payload = {\n943:             \"action\": \"next\",\n944:             \"fork_from_shared_post\": False,\n945:             \"parent_message_id\": new_uuid(),\n946:             \"model\": upstream_model,\n947:             \"client_prepare_state\": \"success\",\n948:             \"timezone_offset_min\": -480,\n949:             \"timezone\": \"Asia/Shanghai\",\n950:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n951:             \"system_hints\": [\"picture_v2\"],\n952:             \"partial_query\": {\n953:                 \"id\": new_uuid(),"
+  },
+  {
+    "repo": "lc2022560478/chatgpt2api",
+    "sha": "17f7ef18498055ebccb280f9ca065be1fce817ed",
+    "path": "services/openai_backend_api.py",
+    "start": 1097,
+    "end": 1110,
+    "url": "https://github.com/lc2022560478/chatgpt2api/blob/17f7ef18498055ebccb280f9ca065be1fce817ed/services/openai_backend_api.py#L1097-L1110",
+    "text": "1097:             }],\n1098:             \"parent_message_id\": new_uuid(),\n1099:             \"model\": upstream_model,\n1100:             \"client_prepare_state\": \"sent\",\n1101:             \"timezone_offset_min\": -480,\n1102:             \"timezone\": \"Asia/Shanghai\",\n1103:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1104:             \"enable_message_followups\": True,\n1105:             \"system_hints\": [\"picture_v2\"],\n1106:             \"supports_buffering\": True,\n1107:             \"supported_encodings\": [\"v1\"],\n1108:             \"client_contextual_info\": {\n1109:                 \"is_dark_mode\": False,\n1110:                 \"time_since_loaded\": 1200,"
+  },
+  {
+    "repo": "lc2022560478/chatgpt2api",
+    "sha": "17f7ef18498055ebccb280f9ca065be1fce817ed",
+    "path": "test/test_account_image_capabilities.py",
+    "start": 102,
+    "end": 107,
+    "url": "https://github.com/lc2022560478/chatgpt2api/blob/17f7ef18498055ebccb280f9ca065be1fce817ed/test/test_account_image_capabilities.py#L102-L107",
+    "text": "102:     def test_versioned_image_models_map_to_their_real_upstream_ids(self) -> None:\n103:         backend = object.__new__(OpenAIBackendAPI)\n104:         self.assertEqual(backend._image_model_settings(IMAGE_25_FLARE_MODEL)[0], IMAGE_25_FLARE_MODEL)\n105:         self.assertEqual(backend._image_model_settings(IMAGE_25_SUNBURST_MODEL)[0], IMAGE_25_SUNBURST_MODEL)\n106:         self.assertEqual(backend._image_model_settings(IMAGE_26_FLARE_MODEL)[0], IMAGE_26_FLARE_MODEL)\n107:         self.assertEqual(backend._image_model_settings(IMAGE_26_SUNBURST_MODEL)[0], IMAGE_26_SUNBURST_MODEL)"
+  },
+  {
+    "repo": "hp0912/chatgpt2api",
+    "sha": "e5bae8714da06c4e3676dd00d04bd56266c35d64",
+    "path": "utils/helper.py",
+    "start": 17,
+    "end": 34,
+    "url": "https://github.com/hp0912/chatgpt2api/blob/e5bae8714da06c4e3676dd00d04bd56266c35d64/utils/helper.py#L17-L34",
+    "text": "17: WEB_IMAGE_MODELS = {\n18:     \"gpt-image-2\",\n19:     \"gpt-image-2.5-flare\",\n20:     \"gpt-image-2.5-sunburst\",\n21:     \"gpt-image-2.6-flare\",\n22:     \"gpt-image-2.6-sunburst\",\n23: }\n24: CODEX_IMAGE_MODELS = {f\"codex-{model}\": model for model in WEB_IMAGE_MODELS}\n25: BASE_IMAGE_MODELS = WEB_IMAGE_MODELS | set(CODEX_IMAGE_MODELS)\n26: IMAGE_MODEL_PLAN_TYPES = (\"plus\", \"team\", \"pro\")\n27: CODEX_IMAGE_MODEL = \"codex-gpt-image-2\"\n28: PREFIXED_CODEX_IMAGE_MODELS = {\n29:     f\"{plan_type}-{model}\"\n30:     for plan_type in IMAGE_MODEL_PLAN_TYPES\n31:     for model in CODEX_IMAGE_MODELS\n32: }\n33: IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS\n34: PUBLIC_IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS"
+  },
+  {
+    "repo": "hp0912/chatgpt2api",
+    "sha": "e5bae8714da06c4e3676dd00d04bd56266c35d64",
+    "path": "services/openai_backend_api.py",
+    "start": 571,
+    "end": 584,
+    "url": "https://github.com/hp0912/chatgpt2api/blob/e5bae8714da06c4e3676dd00d04bd56266c35d64/services/openai_backend_api.py#L571-L584",
+    "text": "571:     def _image_model_settings(self, model: str) -> tuple[str, str]:\n572:         \"\"\"把标准图片模型名映射为上游模型及思考强度。\"\"\"\n573:         _, base_model = split_image_model(model)\n574:         if not base_model:\n575:             return \"auto\", \"\"\n576:         if base_model == \"gpt-image-2\":\n577:             upstream_model = config.default_upstream_model_name\n578:         else:\n579:             # 显式指定的模型保留原 ID，避免新图片模型落回 auto 或默认别名。\n580:             upstream_model = base_model\n581:         model_name, separator, suffix = upstream_model.rpartition(\"-\")\n582:         if separator and suffix.lower() in {\"standard\", \"extended\", \"max\"}:\n583:             return model_name, suffix.lower()\n584:         return upstream_model, self._normalize_thinking_effort(config.default_thinking_effort)"
+  },
+  {
+    "repo": "hp0912/chatgpt2api",
+    "sha": "e5bae8714da06c4e3676dd00d04bd56266c35d64",
+    "path": "services/openai_backend_api.py",
+    "start": 877,
+    "end": 890,
+    "url": "https://github.com/hp0912/chatgpt2api/blob/e5bae8714da06c4e3676dd00d04bd56266c35d64/services/openai_backend_api.py#L877-L890",
+    "text": "877:         path = \"/backend-api/f/conversation/prepare\"\n878:         upstream_model, thinking_effort = self._image_model_settings(model)\n879:         payload = {\n880:             \"action\": \"next\",\n881:             \"fork_from_shared_post\": False,\n882:             \"parent_message_id\": new_uuid(),\n883:             \"model\": upstream_model,\n884:             \"client_prepare_state\": \"success\",\n885:             \"timezone_offset_min\": -480,\n886:             \"timezone\": \"Asia/Shanghai\",\n887:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n888:             \"system_hints\": [\"picture_v2\"],\n889:             \"partial_query\": {\n890:                 \"id\": new_uuid(),"
+  },
+  {
+    "repo": "hp0912/chatgpt2api",
+    "sha": "e5bae8714da06c4e3676dd00d04bd56266c35d64",
+    "path": "services/openai_backend_api.py",
+    "start": 1022,
+    "end": 1031,
+    "url": "https://github.com/hp0912/chatgpt2api/blob/e5bae8714da06c4e3676dd00d04bd56266c35d64/services/openai_backend_api.py#L1022-L1031",
+    "text": "1022:             }],\n1023:             \"parent_message_id\": new_uuid(),\n1024:             \"model\": upstream_model,\n1025:             \"client_prepare_state\": \"sent\",\n1026:             \"timezone_offset_min\": -480,\n1027:             \"timezone\": \"Asia/Shanghai\",\n1028:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1029:             \"enable_message_followups\": True,\n1030:             \"system_hints\": [\"picture_v2\"],\n1031:             \"supports_buffering\": True,"
+  },
+  {
+    "repo": "hp0912/chatgpt2api",
+    "sha": "e5bae8714da06c4e3676dd00d04bd56266c35d64",
+    "path": "test/test_image_model_routing.py",
+    "start": 35,
+    "end": 64,
+    "url": "https://github.com/hp0912/chatgpt2api/blob/e5bae8714da06c4e3676dd00d04bd56266c35d64/test/test_image_model_routing.py#L35-L64",
+    "text": "35:     def test_web_prepare_and_generate_preserve_image_model_variants_with_reference_images(self) -> None:\n36:         backend = object.__new__(OpenAIBackendAPI)\n37:         backend.base_url = \"https://chatgpt.com\"\n38:         backend.session = mock.Mock()\n39:         response = backend.session.post.return_value\n40:         response.status_code = 200\n41:         response.json.return_value = {\"conduit_token\": \"conduit-token\"}\n42:         reference = {\n43:             \"file_id\": \"file-reference\", \"file_name\": \"reference.png\", \"file_size\": 10,\n44:             \"mime_type\": \"image/png\", \"width\": 1024, \"height\": 1024,\n45:         }\n46:         for model in IMAGE_VARIANT_MODELS:\n47:             for references in ([], [reference]):\n48:                 with (\n49:                     self.subTest(model=model, edit=bool(references)),\n50:                     mock.patch.object(backend, \"_image_headers\", return_value={}),\n51:                     mock.patch.dict(config.data, {\"default_upstream_model_name\": \"gpt-5-5\", \"default_thinking_effort\": \"\"}),\n52:                 ):\n53:                     backend.session.post.reset_mock()\n54:                     token = backend._prepare_image_conversation(\"draw a cat\", ChatRequirements(\"token\"), model)\n55:                     backend._start_image_generation(\"draw a cat\", ChatRequirements(\"token\"), token, model, references)\n56: \n57:                 self.assertEqual(token, \"conduit-token\")\n58:                 prepare, generate = backend.session.post.call_args_list\n59:                 self.assertTrue(prepare.args[0].endswith(\"/conversation/prepare\"))\n60:                 self.assertEqual(prepare.kwargs[\"json\"][\"model\"], model)\n61:                 payload = generate.kwargs[\"json\"]\n62:                 self.assertEqual(payload[\"model\"], model)\n63:                 self.assertEqual(payload[\"system_hints\"], [\"picture_v2\"])\n64:                 self.assertEqual(len(payload[\"messages\"][0][\"content\"][\"parts\"]), 1 + len(references))"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "utils/helper.py",
+    "start": 22,
+    "end": 44,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/utils/helper.py#L22-L44",
+    "text": "22: WEB_IMAGE_2_6_MODELS = {\n23:     \"gpt-image-2.6-flare\",\n24:     \"gpt-image-2.6-sunburst\",\n25: }\n26: WEB_IMAGE_MODELS = {\"gpt-image-2\"} | WEB_IMAGE_2_5_MODELS | WEB_IMAGE_2_6_MODELS\n27: CODEX_IMAGE_MODEL = \"codex-gpt-image-2\"\n28: CODEX_IMAGE_MODELS = {\n29:     \"codex-gpt-image-2\",\n30:     \"codex-gpt-image-2.5\",\n31:     \"codex-gpt-image-2.5-flare\",\n32:     \"codex-gpt-image-2.5-sunburst\",\n33:     \"codex-gpt-image-2.6\",\n34:     \"codex-gpt-image-2.6-flare\",\n35:     \"codex-gpt-image-2.6-sunburst\",\n36: }\n37: CODEX_TOOL_MODELS = {\n38:     \"codex-gpt-image-2\": \"gpt-image-2\",\n39:     \"codex-gpt-image-2.5\": \"gpt-image-2.5-flare\",\n40:     \"codex-gpt-image-2.5-flare\": \"gpt-image-2.5-flare\",\n41:     \"codex-gpt-image-2.5-sunburst\": \"gpt-image-2.5-sunburst\",\n42:     \"codex-gpt-image-2.6\": \"gpt-image-2.6-flare\",\n43:     \"codex-gpt-image-2.6-flare\": \"gpt-image-2.6-flare\",\n44:     \"codex-gpt-image-2.6-sunburst\": \"gpt-image-2.6-sunburst\","
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/openai_backend_api.py",
+    "start": 676,
+    "end": 684,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/openai_backend_api.py#L676-L684",
+    "text": "676:     def _image_model_settings(self, model: str) -> tuple[str, str]:\n677:         \"\"\"把标准图片模型名映射为上游模型及思考强度。\"\"\"\n678:         upstream_model = resolve_image_upstream_model(model, config.default_upstream_model_name)\n679:         if not upstream_model:\n680:             return \"auto\", \"\"\n681:         model_name, separator, suffix = upstream_model.rpartition(\"-\")\n682:         if separator and suffix.lower() in {\"standard\", \"extended\", \"max\"}:\n683:             return model_name, suffix.lower()\n684:         return upstream_model, self._normalize_thinking_effort(config.default_thinking_effort)"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/openai_backend_api.py",
+    "start": 989,
+    "end": 1000,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/openai_backend_api.py#L989-L1000",
+    "text": "989:         path = \"/backend-api/f/conversation/prepare\"\n990:         upstream_model, thinking_effort = self._image_model_settings(model)\n991:         trace_id = new_uuid()\n992:         self._image_turn_trace_id = trace_id\n993:         payload = {\n994:             \"action\": \"next\",\n995:             \"is_do_not_remember\": False,\n996:             \"model\": upstream_model,\n997:             \"parent_message_id\": \"client-created-root\",\n998:             \"system_hints\": [\"picture_v2\"],\n999:             \"timezone\": \"Asia/Shanghai\",\n1000:             \"timezone_offset_min\": -480,"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/openai_backend_api.py",
+    "start": 1157,
+    "end": 1166,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/openai_backend_api.py#L1157-L1166",
+    "text": "1157:             }],\n1158:             \"parent_message_id\": CLIENT_CREATED_ROOT,\n1159:             \"model\": upstream_model,\n1160:             \"system_hints\": [\"picture_v2\"],\n1161:             \"timezone_offset_min\": -480,\n1162:             \"timezone\": \"Asia/Shanghai\",\n1163:             \"client_contextual_info\": {\n1164:                 \"app_name\": \"chatgpt.com\",\n1165:                 \"app_surface\": \"codex_browser\",\n1166:                 \"has_web_push_capabilities\": True,"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "test/test_gif_output.py",
+    "start": 15,
+    "end": 45,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/test/test_gif_output.py#L15-L45",
+    "text": "15: GIF = base64.b64decode(\"R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\")\n16: \n17: \n18: class GifRequestTests(unittest.TestCase):\n19:     def test_frame_fields_use_official_bounds(self) -> None:\n20:         self.assertEqual(gif_frame_count(None), 9)\n21:         self.assertEqual(gif_frame_count(1), 2)\n22:         self.assertEqual(gif_frame_count(99), 64)\n23:         self.assertEqual(gif_frame_duration_ms(None), 200)\n24:         self.assertEqual(gif_frame_duration_ms(25), 20)\n25:         self.assertEqual(gif_frame_duration_ms(5000), 2000)\n26: \n27:     def test_web_prompt_states_gif_timing(self) -> None:\n28:         prompt = conversation.build_image_prompt(\"a lantern\", \"1024x1024\", \"low\", \"gif\", 9, 200)\n29:         self.assertIn(\"输出动画 GIF，9 帧，每帧 200 毫秒。\", prompt)\n30: \n31:     def test_gif_bytes_skip_upscale(self) -> None:\n32:         items = [{\"b64_json\": base64.b64encode(GIF).decode(\"ascii\")}]\n33:         saved: list[bytes] = []\n34:         with mock.patch.object(conversation, \"save_image_bytes\", side_effect=lambda data, base_url=None: saved.append(data) or \"u\"), \\\n35:                 mock.patch.object(conversation, \"maybe_upscale_image\", side_effect=AssertionError(\"gif was resized\")):\n36:             conversation.format_image_result(items, \"p\", \"b64_json\", size=\"1024x1024\")\n37:         self.assertEqual(saved, [GIF])\n38: \n39:     def test_edits_reject_gif(self) -> None:\n40:         request = conversation.ConversationRequest(model=\"gpt-image-2\", prompt=\"cat\", output_format=\"gif\", images=[\"a\"])\n41:         with self.assertRaises(ImageGenerationError):\n42:             list(conversation.stream_image_outputs_with_pool(request))\n43: \n44:     def test_saved_name_uses_gif_suffix(self) -> None:\n45:         self.assertTrue(ImageStorageService().make_relative_path(GIF).endswith(\".gif\"))"
+  },
+  {
+    "repo": "IFuZYI/chatgpt2api",
+    "sha": "af7bef567604877e0e6d452c64ed4d6ee8208004",
+    "path": "internal/protocol/models.go",
+    "start": 14,
+    "end": 25,
+    "url": "https://github.com/IFuZYI/chatgpt2api/blob/af7bef567604877e0e6d452c64ed4d6ee8208004/internal/protocol/models.go#L14-L25",
+    "text": "14: // 2026-11 上游新增 2.6 系列（ChatGPT Images 2.6，API 侧为 Flare / Sunburst）。\n15: //\n16: // 注意：这些 slug 不在 /backend-api/models 的返回里（该端点只暴露文本模型），\n17: // 无法通过接口自动发现，只能实测确认后写死。新增模型时同样要实测出图再收录。\n18: var baseImageModels = map[string]bool{\n19: \t\"gpt-image-2\":            true,\n20: \t\"gpt-image-2.5\":          true,\n21: \t\"gpt-image-2.5-flare\":    true,\n22: \t\"gpt-image-2.5-sunburst\": true,\n23: \t\"gpt-image-2.6\":          true,\n24: \t\"gpt-image-2.6-flare\":    true,\n25: \t\"gpt-image-2.6-sunburst\": true,"
+  },
+  {
+    "repo": "IFuZYI/chatgpt2api",
+    "sha": "af7bef567604877e0e6d452c64ed4d6ee8208004",
+    "path": "internal/upstream/image_chain.go",
+    "start": 28,
+    "end": 60,
+    "url": "https://github.com/IFuZYI/chatgpt2api/blob/af7bef567604877e0e6d452c64ed4d6ee8208004/internal/upstream/image_chain.go#L28-L60",
+    "text": "28: func (c *Client) imageModelSettings(model string, defaultUpstream string, defaultEffort string) (string, string) {\n29: \t_, baseModel := protocol.SplitImageModel(model)\n30: \tif baseModel == \"\" {\n31: \t\treturn \"auto\", \"\"\n32: \t}\n33: \tvar upstreamModel string\n34: \tswitch baseModel {\n35: \tcase \"gpt-image-2\":\n36: \t\t// gpt-image-2 是「通用出图」入口：上游模型由配置决定（默认 auto），\n37: \t\t// 这样用户可以用 default_upstream_model_name 切换底层模型。\n38: \t\t//\n39: \t\t// 回退值用 auto 而不是 gpt-5-5：后者已从上游模型列表消失，\n40: \t\t// 继续用它会让这条链路指向不存在的模型。\n41: \t\tif defaultUpstream == \"\" {\n42: \t\t\tdefaultUpstream = \"auto\"\n43: \t\t}\n44: \t\tupstreamModel = defaultUpstream\n45: \tdefault:\n46: \t\t// codex 系列不会走到这里（StreamImage 已在入口分流到 /codex/responses），\n47: \t\t// 但 IsSupportedImageModel 兜住它，保证即使被误调用也透传模型名而不是 \"auto\"。\n48: \t\t//\n49: \t\t// 2.5/2.6 系列（gpt-image-2.5 / -flare / -sunburst、gpt-image-2.6 / -flare / -sunburst）：\n50: \t\t// 模型名本身就是上游 slug，直接透传。实测 2.5 的三个名字作为\n51: \t\t// upstream_model 传给 /f/conversation 能正常出图（三者字节数各异，\n52: \t\t// 确认是不同模型）；2.6 系列按同一规则透传。\n53: \t\t// 不要走 defaultUpstream 映射 —— 那会把它们全变成同一个模型，退化。\n54: \t\tif protocol.IsSupportedImageModel(baseModel) {\n55: \t\t\tupstreamModel = baseModel\n56: \t\t} else {\n57: \t\t\treturn \"auto\", \"\"\n58: \t\t}\n59: \t}\n60: "
+  },
+  {
+    "repo": "IFuZYI/chatgpt2api",
+    "sha": "af7bef567604877e0e6d452c64ed4d6ee8208004",
+    "path": "internal/upstream/image_chain.go",
+    "start": 111,
+    "end": 124,
+    "url": "https://github.com/IFuZYI/chatgpt2api/blob/af7bef567604877e0e6d452c64ed4d6ee8208004/internal/upstream/image_chain.go#L111-L124",
+    "text": "111: \tupstreamModel, thinkingEffort := c.imageModelSettings(model, defaultUpstream, defaultEffort)\n112: \n113: \tpayload := map[string]any{\n114: \t\t\"action\":                 \"next\",\n115: \t\t\"fork_from_shared_post\":  false,\n116: \t\t\"parent_message_id\":      newUUID(),\n117: \t\t\"model\":                  upstreamModel,\n118: \t\t\"client_prepare_state\":   \"success\",\n119: \t\t\"timezone_offset_min\":    -480,\n120: \t\t\"timezone\":               \"Asia/Shanghai\",\n121: \t\t\"conversation_mode\":      map[string]any{\"kind\": \"primary_assistant\"},\n122: \t\t\"system_hints\":           []any{\"picture_v2\"},\n123: \t\t\"supports_buffering\":     true,\n124: \t\t\"supported_encodings\":    []any{\"v1\"},"
+  },
+  {
+    "repo": "IFuZYI/chatgpt2api",
+    "sha": "af7bef567604877e0e6d452c64ed4d6ee8208004",
+    "path": "internal/upstream/image_chain.go",
+    "start": 215,
+    "end": 257,
+    "url": "https://github.com/IFuZYI/chatgpt2api/blob/af7bef567604877e0e6d452c64ed4d6ee8208004/internal/upstream/image_chain.go#L215-L257",
+    "text": "215: \tpayload := map[string]any{\n216: \t\t\"action\": \"next\",\n217: \t\t\"messages\": []any{map[string]any{\n218: \t\t\t\"id\":          newUUID(),\n219: \t\t\t\"author\":      map[string]any{\"role\": \"user\"},\n220: \t\t\t\"create_time\": float64(time.Now().UnixNano()) / 1e9,\n221: \t\t\t\"content\":     content,\n222: \t\t\t\"metadata\":    metadata,\n223: \t\t}},\n224: \t\t\"parent_message_id\":        newUUID(),\n225: \t\t\"model\":                    upstreamModel,\n226: \t\t\"client_prepare_state\":     \"sent\",\n227: \t\t\"timezone_offset_min\":      -480,\n228: \t\t\"timezone\":                 \"Asia/Shanghai\",\n229: \t\t\"conversation_mode\":        map[string]any{\"kind\": \"primary_assistant\"},\n230: \t\t\"enable_message_followups\": true,\n231: \t\t\"system_hints\":             []any{\"picture_v2\"},\n232: \t\t\"supports_buffering\":       true,\n233: \t\t\"supported_encodings\":      []any{\"v1\"},\n234: \t\t\"client_contextual_info\": map[string]any{\n235: \t\t\t\"is_dark_mode\":      false,\n236: \t\t\t\"time_since_loaded\": 1200,\n237: \t\t\t\"page_height\":       1072,\n238: \t\t\t\"page_width\":        1724,\n239: \t\t\t\"pixel_ratio\":       1.2,\n240: \t\t\t\"screen_height\":     1440,\n241: \t\t\t\"screen_width\":      2560,\n242: \t\t\t\"app_name\":          \"chatgpt.com\",\n243: \t\t},\n244: \t\t\"paragen_cot_summary_display_override\": \"allow\",\n245: \t\t\"force_parallel_switch\":                \"auto\",\n246: \t}\n247: \tif thinkingEffort != \"\" {\n248: \t\tpayload[\"thinking_effort\"] = thinkingEffort\n249: \t}\n250: \n251: \tbody, err := json.Marshal(payload)\n252: \tif err != nil {\n253: \t\treturn nil, err\n254: \t}\n255: \n256: \tpath := \"/backend-api/f/conversation\"\n257: \thttpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseURL+path, newBytesReader(body))"
+  },
+  {
+    "repo": "IFuZYI/chatgpt2api",
+    "sha": "af7bef567604877e0e6d452c64ed4d6ee8208004",
+    "path": "internal/upstream/image_model_settings_test.go",
+    "start": 38,
+    "end": 49,
+    "url": "https://github.com/IFuZYI/chatgpt2api/blob/af7bef567604877e0e6d452c64ed4d6ee8208004/internal/upstream/image_model_settings_test.go#L38-L49",
+    "text": "38: // 2.6 系列同样必须把模型名原样透传给上游，不能被 defaultUpstream 吃掉。\n39: func TestImageModelSettings26SeriesPassThrough(t *testing.T) {\n40: \tc := &Client{}\n41: \tfor _, model := range []string{\n42: \t\t\"gpt-image-2.6\",\n43: \t\t\"gpt-image-2.6-flare\",\n44: \t\t\"gpt-image-2.6-sunburst\",\n45: \t} {\n46: \t\tupstream, _ := c.imageModelSettings(model, \"gpt-5-6\", \"auto\")\n47: \t\tif upstream != model {\n48: \t\t\tt.Errorf(\"%q -> upstream %q, want pass-through %q\", model, upstream, model)\n49: \t\t}"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "utils/helper.py",
+    "start": 17,
+    "end": 29,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/utils/helper.py#L17-L29",
+    "text": "17: IMAGE_26_MODELS = {\"gpt-image-2.6-sunburst\", \"gpt-image-2.6-flare\"}\n18: WEB_IMAGE_MODELS = {\"gpt-image-2\"} | IMAGE_26_MODELS\n19: CODEX_IMAGE_MODELS = {\"codex-gpt-image-2\"} | {f\"codex-{model}\" for model in IMAGE_26_MODELS}\n20: BASE_IMAGE_MODELS = WEB_IMAGE_MODELS | CODEX_IMAGE_MODELS\n21: IMAGE_MODEL_PLAN_TYPES = (\"plus\", \"team\", \"pro\")\n22: CODEX_IMAGE_MODEL = \"codex-gpt-image-2\"\n23: PREFIXED_CODEX_IMAGE_MODELS = {\n24:     f\"{plan_type}-{model}\"\n25:     for plan_type in IMAGE_MODEL_PLAN_TYPES\n26:     for model in CODEX_IMAGE_MODELS\n27: }\n28: IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS\n29: PUBLIC_IMAGE_MODELS = BASE_IMAGE_MODELS | PREFIXED_CODEX_IMAGE_MODELS"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/openai_backend_api.py",
+    "start": 621,
+    "end": 632,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/openai_backend_api.py#L621-L632",
+    "text": "621:     def _image_model_slug(self, model: str) -> str:\n622:         \"\"\"把标准图片模型名映射到底层 model slug。\"\"\"\n623:         _, base_model = split_image_model(model)\n624:         if not base_model:\n625:             return \"auto\"\n626:         if base_model == \"gpt-image-2\":\n627:             return \"gpt-5-3\"\n628:         if base_model in IMAGE_26_MODELS:\n629:             return base_model\n630:         if base_model == CODEX_IMAGE_MODEL:\n631:             return base_model\n632:         return \"auto\""
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/openai_backend_api.py",
+    "start": 933,
+    "end": 945,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/openai_backend_api.py#L933-L945",
+    "text": "933:         path = \"/backend-api/f/conversation/prepare\"\n934:         payload = {\n935:             \"action\": \"next\",\n936:             \"fork_from_shared_post\": False,\n937:             \"parent_message_id\": new_uuid(),\n938:             \"model\": self._image_model_slug(model),\n939:             \"client_prepare_state\": \"success\",\n940:             \"timezone_offset_min\": -480,\n941:             \"timezone\": \"Asia/Shanghai\",\n942:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n943:             \"system_hints\": [\"picture_v2\"],\n944:             \"partial_query\": {\n945:                 \"id\": new_uuid(),"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/openai_backend_api.py",
+    "start": 1074,
+    "end": 1086,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/openai_backend_api.py#L1074-L1086",
+    "text": "1074:             }],\n1075:             \"parent_message_id\": new_uuid(),\n1076:             \"model\": self._image_model_slug(model),\n1077:             \"client_prepare_state\": \"sent\",\n1078:             \"timezone_offset_min\": -480,\n1079:             \"timezone\": \"Asia/Shanghai\",\n1080:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1081:             \"enable_message_followups\": True,\n1082:             \"system_hints\": [\"picture_v2\"],\n1083:             \"supports_buffering\": True,\n1084:             \"supported_encodings\": [\"v1\"],\n1085:             \"client_contextual_info\": {\n1086:                 \"is_dark_mode\": False,"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "test/test_web_image26.py",
+    "start": 26,
+    "end": 55,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/test/test_web_image26.py#L26-L55",
+    "text": "26:     def test_prepare_and_generation_both_use_exact_web_slug(self):\n27:         backend = OpenAIBackendAPI.__new__(OpenAIBackendAPI)\n28:         backend.base_url = \"https://chatgpt.com\"\n29:         backend.session = mock.Mock()\n30:         backend.session.post.return_value.status_code = 200\n31:         backend.session.post.return_value.json.return_value = {\"conduit_token\": \"conduit\"}\n32:         with mock.patch.object(backend, \"_image_headers\", return_value={}):\n33:             requirements = ChatRequirements(token=\"requirements\")\n34:             self.assertEqual(backend._prepare_image_conversation(\"animate\", requirements, WEB_MODEL), \"conduit\")\n35:             backend._start_image_generation(\"animate\", requirements, \"conduit\", WEB_MODEL)\n36:         calls = backend.session.post.call_args_list\n37:         self.assertEqual(calls[0].args[0], \"https://chatgpt.com/backend-api/f/conversation/prepare\")\n38:         self.assertEqual(calls[1].args[0], \"https://chatgpt.com/backend-api/f/conversation\")\n39:         for call in calls:\n40:             payload = call.kwargs[\"json\"]\n41:             self.assertEqual(payload[\"model\"], WEB_MODEL)\n42:             self.assertEqual(payload[\"system_hints\"], [\"picture_v2\"])\n43:             self.assertNotIn(\"output_format\", payload)\n44:             self.assertNotIn(\"frame_count\", payload)\n45: \n46:     def test_gif_prompt_timing_reaches_actual_web_conversation(self):\n47:         backend = mock.Mock()\n48:         backend.stream_conversation.return_value = iter([])\n49:         with mock.patch.object(conversation, \"prompt_with_global_system\", side_effect=lambda value: value):\n50:             list(conversation.conversation_events(backend, model=WEB_MODEL, prompt=\"a lantern\", size=\"auto\", output_format=\"gif\", frame_count=8, frame_duration_ms=205))\n51:         kwargs = backend.stream_conversation.call_args.kwargs\n52:         self.assertEqual(kwargs[\"model\"], WEB_MODEL)\n53:         self.assertEqual(kwargs[\"system_hints\"], [\"picture_v2\"])\n54:         self.assertIn(\"8 帧，每帧 210 毫秒\", kwargs[\"prompt\"])\n55:         self.assertIn(\"a lantern\", kwargs[\"prompt\"])"
+  },
+  {
+    "repo": "Micah123321/chatgpt2api",
+    "sha": "663175e6e0f2014e47ab324c7c3fbcf354c580e2",
+    "path": "utils/helper.py",
+    "start": 20,
+    "end": 33,
+    "url": "https://github.com/Micah123321/chatgpt2api/blob/663175e6e0f2014e47ab324c7c3fbcf354c580e2/utils/helper.py#L20-L33",
+    "text": "20: DEFAULT_WEB_IMAGE_MODELS = {\n21:     \"gpt-image-2.6\",\n22:     \"gpt-image-2.6-flare\",\n23:     \"gpt-image-2.6-sunburst\",\n24:     \"gpt-image-2.5\",\n25:     \"gpt-image-2.5-sunburst\",\n26:     \"gpt-image-2.5-flare\",\n27:     \"gpt-image-2\",\n28:     \"gpt-5-5-thinking\",\n29:     \"gpt-5-5\",\n30:     \"gpt-5-3\",\n31: }\n32: IMAGE_MODEL_PLAN_TYPES = (\"plus\", \"team\", \"pro\")\n33: CODEX_IMAGE_MODEL = \"codex-gpt-image-2\""
+  },
+  {
+    "repo": "Micah123321/chatgpt2api",
+    "sha": "663175e6e0f2014e47ab324c7c3fbcf354c580e2",
+    "path": "services/openai_backend_api.py",
+    "start": 684,
+    "end": 697,
+    "url": "https://github.com/Micah123321/chatgpt2api/blob/663175e6e0f2014e47ab324c7c3fbcf354c580e2/services/openai_backend_api.py#L684-L697",
+    "text": "684:     def _image_model_slug(self, model: str) -> str:\n685:         \"\"\"把标准图片模型名映射到底层 model slug。\"\"\"\n686:         _, base_model = split_image_model(model)\n687:         if not base_model:\n688:             return \"auto\"\n689:         if base_model == \"gpt-image-2.6\":\n690:             return \"gpt-image-2.6-flare\"\n691:         if base_model == \"gpt-image-2.5\":\n692:             return \"gpt-image-2.5-flare\"\n693:         if base_model == \"gpt-image-2\":\n694:             return \"gpt-5-5-thinking\"\n695:         if base_model == CODEX_IMAGE_MODEL:\n696:             return base_model\n697:         return base_model"
+  },
+  {
+    "repo": "Micah123321/chatgpt2api",
+    "sha": "663175e6e0f2014e47ab324c7c3fbcf354c580e2",
+    "path": "services/openai_backend_api.py",
+    "start": 1000,
+    "end": 1014,
+    "url": "https://github.com/Micah123321/chatgpt2api/blob/663175e6e0f2014e47ab324c7c3fbcf354c580e2/services/openai_backend_api.py#L1000-L1014",
+    "text": "1000:         payload = {\n1001:             \"action\": \"next\",\n1002:             \"fork_from_shared_post\": False,\n1003:             \"parent_message_id\": new_uuid(),\n1004:             \"model\": self._image_model_slug(model),\n1005:             \"client_prepare_state\": \"success\",\n1006:             \"timezone_offset_min\": -480,\n1007:             \"timezone\": \"Asia/Shanghai\",\n1008:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1009:             \"system_hints\": [\"picture_v2\"],\n1010:             \"partial_query\": {\n1011:                 \"id\": new_uuid(),\n1012:                 \"author\": {\"role\": \"user\"},\n1013:                 \"content\": {\"content_type\": \"text\", \"parts\": [prompt]},\n1014:             },"
+  },
+  {
+    "repo": "Micah123321/chatgpt2api",
+    "sha": "663175e6e0f2014e47ab324c7c3fbcf354c580e2",
+    "path": "services/openai_backend_api.py",
+    "start": 1135,
+    "end": 1150,
+    "url": "https://github.com/Micah123321/chatgpt2api/blob/663175e6e0f2014e47ab324c7c3fbcf354c580e2/services/openai_backend_api.py#L1135-L1150",
+    "text": "1135:                 \"id\": new_uuid(),\n1136:                 \"author\": {\"role\": \"user\"},\n1137:                 \"create_time\": time.time(),\n1138:                 \"content\": content,\n1139:                 \"metadata\": metadata,\n1140:             }],\n1141:             \"parent_message_id\": new_uuid(),\n1142:             \"model\": self._image_model_slug(model),\n1143:             \"client_prepare_state\": \"sent\",\n1144:             \"timezone_offset_min\": -480,\n1145:             \"timezone\": \"Asia/Shanghai\",\n1146:             \"conversation_mode\": {\"kind\": \"primary_assistant\"},\n1147:             \"enable_message_followups\": True,\n1148:             \"system_hints\": [\"picture_v2\"],\n1149:             \"supports_buffering\": True,\n1150:             \"supported_encodings\": [\"v1\"],"
+  },
+  {
+    "repo": "Micah123321/chatgpt2api",
+    "sha": "663175e6e0f2014e47ab324c7c3fbcf354c580e2",
+    "path": "test/test_multi_image_results.py",
+    "start": 85,
+    "end": 91,
+    "url": "https://github.com/Micah123321/chatgpt2api/blob/663175e6e0f2014e47ab324c7c3fbcf354c580e2/test/test_multi_image_results.py#L85-L91",
+    "text": "85:     def test_image_26_routes_with_legacy_catalog(self) -> None:\n86:         backend = OpenAIBackendAPI.__new__(OpenAIBackendAPI)\n87:         with mock.patch.dict(config.data, {\"image_models_cache\": [\"gpt-image-2.5-flare\"]}):\n88:             for model, expected in ((\"gpt-image-2.6\", \"gpt-image-2.6-flare\"), (\"gpt-image-2.6-flare\", \"gpt-image-2.6-flare\"), (\"gpt-image-2.6-sunburst\", \"gpt-image-2.6-sunburst\")):\n89:                 with self.subTest(model=model):\n90:                     self.assertIn(model, config.image_models)\n91:                     self.assertEqual(backend._image_model_slug(model), expected)"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/protocol/conversation.py",
+    "start": 280,
+    "end": 298,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/protocol/conversation.py#L280-L298",
+    "text": "280: def build_image_prompt(\n281:     prompt: str,\n282:     size: str | None,\n283:     quality: str = \"auto\",\n284:     output_format: str = \"png\",\n285:     frame_count: int | None = None,\n286:     frame_duration_ms: int | None = None,\n287: ) -> str:\n288:     hints = []\n289:     # 网页生图没有 output_format 这类工具参数，只能靠提示词要求动图。\n290:     if output_format == \"gif\":\n291:         frames = f\"{frame_count} 帧\" if frame_count else \"多帧\"\n292:         duration = f\"，每帧 {frame_duration_ms} 毫秒\" if frame_duration_ms else \"\"\n293:         hints.append(f\"输出可循环播放的动画 GIF（{frames}{duration}），不要输出静态图片。\")\n294:     if size:\n295:         hints.append(f\"输出图片尺寸为 {size}。\")\n296:     if quality:\n297:         hints.append(f\"输出图片质量为 {quality}。\")\n298:     return f\"{prompt.strip()}\\n\\n{''.join(hints)}\" if hints else prompt"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/protocol/conversation.py",
+    "start": 340,
+    "end": 390,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/protocol/conversation.py#L340-L390",
+    "text": "340: def image_bytes_format(payload: bytes) -> tuple[str, bool]:\n341:     \"\"\"返回图片字节的真实 MIME 与是否动图，无法解析时按静态 PNG 处理。\"\"\"\n342:     try:\n343:         with Image.open(io.BytesIO(payload)) as image:\n344:             mime_type = Image.MIME.get(image.format or \"\", \"image/png\")\n345:             return mime_type, bool(getattr(image, \"is_animated\", False))\n346:     except Exception:\n347:         return \"image/png\", False\n348: \n349: \n350: def format_image_result(\n351:     items: list[dict[str, Any]],\n352:     prompt: str,\n353:     response_format: str,\n354:     base_url: str | None = None,\n355:     created: int | None = None,\n356:     message: str = \"\",\n357:     output_format: str = \"png\",\n358: ) -> dict[str, Any]:\n359:     data: list[dict[str, Any]] = []\n360:     for item in items:\n361:         b64_json = str(item.get(\"b64_json\") or \"\").strip()\n362:         if not b64_json:\n363:             continue\n364:         image_bytes = base64.b64decode(b64_json)\n365:         # 上游按提示词可能直接回一段动图字节，落盘前先把真实格式和是否动图记下来，\n366:         # 客户端据此才能决定用 <img> 还是动图播放器。\n367:         mime_type, animated = image_bytes_format(image_bytes)\n368:         # 要 GIF 却拿到静态图时宁可报错，也不把 PNG 改名成 .gif 蒙混过去。\n369:         if output_format == \"gif\" and not (is_gif_bytes(image_bytes) and animated):\n370:             continue\n371:         revised_prompt = str(item.get(\"revised_prompt\") or prompt).strip() or prompt\n372:         if response_format == \"b64_json\":\n373:             data.append({\n374:                 \"b64_json\": b64_json,\n375:                 \"url\": save_image_bytes(image_bytes, base_url),\n376:                 \"mime_type\": mime_type,\n377:                 \"animated\": animated,\n378:                 \"revised_prompt\": revised_prompt,\n379:             })\n380:         else:\n381:             data.append({\n382:                 \"url\": save_image_bytes(image_bytes, base_url),\n383:                 \"mime_type\": mime_type,\n384:                 \"animated\": animated,\n385:                 \"revised_prompt\": revised_prompt,\n386:             })\n387:     if output_format == \"gif\" and not data:\n388:         raise ImageGenerationError(\n389:             \"上游没有返回动图（拿到的是静态图或单帧 GIF），请重试或改用 png\",\n390:             code=\"output_format_mismatch\","
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/image_storage_service.py",
+    "start": 218,
+    "end": 243,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/image_storage_service.py#L218-L243",
+    "text": "218:     def make_relative_path(self, image_data: bytes) -> str:\n219:         file_hash = hashlib.md5(image_data).hexdigest()\n220:         filename = f\"{int(time.time())}_{file_hash}.{_image_extension(image_data)}\"\n221:         relative_dir = Path(time.strftime(\"%Y\"), time.strftime(\"%m\"), time.strftime(\"%d\"))\n222:         return f\"{relative_dir.as_posix()}/{filename}\"\n223: \n224:     def save(self, image_data: bytes, base_url: str | None = None) -> StoredImage:\n225:         config.cleanup_old_images()\n226:         rel = self.make_relative_path(image_data)\n227:         mode = self.mode()\n228:         if mode not in {\"local\", \"webdav\", \"both\"}:\n229:             mode = \"local\"\n230:         stored_local = False\n231:         stored_webdav = False\n232:         remote_url = \"\"\n233: \n234:         if mode in {\"local\", \"both\"}:\n235:             path = _local_image_path(rel)\n236:             path.parent.mkdir(parents=True, exist_ok=True)\n237:             path.write_bytes(image_data)\n238:             stored_local = True\n239: \n240:         if mode in {\"webdav\", \"both\"}:\n241:             remote_url = WebDAVClient(self.settings()).put(\n242:                 rel, image_data, content_type=_image_mime_type(image_data)\n243:             )"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/protocol/conversation.py",
+    "start": 1693,
+    "end": 1697,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/protocol/conversation.py#L1693-L1697",
+    "text": "1693:     # 动图是逐帧生成，沿用静态图的 120 秒会在最后一帧前被掐断。\n1694:     image_timeout_secs = float(config.image_poll_timeout_secs)\n1695:     if request.output_format == \"gif\":\n1696:         image_timeout_secs = max(image_timeout_secs, GIF_IMAGE_TIMEOUT_SECS)\n1697:     request_deadline = time.monotonic() + image_timeout_secs"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "utils/helper.py",
+    "start": 41,
+    "end": 44,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/utils/helper.py#L41-L44",
+    "text": "41: GIF_DEFAULT_FRAME_COUNT = 9\n42: GIF_DEFAULT_FRAME_DURATION_MS = 200\n43: # 动图上游要逐帧生成，实测近 3 分钟，沿用静态图的 120 秒会被截断。\n44: GIF_IMAGE_TIMEOUT_SECS = 300.0"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "utils/helper.py",
+    "start": 184,
+    "end": 198,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/utils/helper.py#L184-L198",
+    "text": "184:     def integer(value: object, default: int, low: int, high: int, name: str) -> int:\n185:         if value is None or value == \"\":\n186:             return default\n187:         if isinstance(value, bool) or not str(value).strip().isdigit():\n188:             raise ValueError(f\"{name} must be an integer\")\n189:         number = int(str(value).strip())\n190:         if not low <= number <= high:\n191:             raise ValueError(f\"{name} must be between {low} and {high}\")\n192:         return number\n193: \n194:     count = integer(frame_count, GIF_DEFAULT_FRAME_COUNT, 2, 64, \"frame_count\")\n195:     duration = integer(frame_duration_ms, GIF_DEFAULT_FRAME_DURATION_MS, 20, 2000, \"frame_duration_ms\")\n196:     if duration % 10:\n197:         raise ValueError(\"frame_duration_ms must be a multiple of 10\")\n198:     return fmt, count, duration"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "test/test_gif_output.py",
+    "start": 18,
+    "end": 21,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/test/test_gif_output.py#L18-L21",
+    "text": "18: def animated_gif_bytes(frames: int = 2) -> bytes:\n19:     buffer = io.BytesIO()\n20:     images = [Image.new(\"RGB\", (8, 8), \"red\" if index % 2 == 0 else \"blue\") for index in range(frames)]\n21:     images[0].save(buffer, format=\"GIF\", save_all=True, append_images=images[1:], duration=200, loop=0)"
+  },
+  {
+    "repo": "jiawen-afk/chatgpt2api",
+    "sha": "7ab8c20281133f8e78f54b8c762a604e702abebb",
+    "path": "services/protocol/conversation.py",
+    "start": 1710,
+    "end": 1715,
+    "url": "https://github.com/jiawen-afk/chatgpt2api/blob/7ab8c20281133f8e78f54b8c762a604e702abebb/services/protocol/conversation.py#L1710-L1715",
+    "text": "1710:             plan_type, _ = split_image_model(request.model)\n1711:             codex_model = is_codex_image_model(request.model)\n1712:             token = account_service.get_available_access_token(\n1713:                 plan_type=plan_type,\n1714:                 source_type=\"codex\" if codex_model else None,\n1715:                 plan_types=(\"plus\", \"team\", \"pro\") if codex_model and not plan_type else None,"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/protocol/conversation.py",
+    "start": 273,
+    "end": 290,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/protocol/conversation.py#L273-L290",
+    "text": "273: def build_image_prompt(\n274:     prompt: str,\n275:     size: str | None,\n276:     quality: str = \"auto\",\n277:     output_format: str = \"png\",\n278:     frame_count: int | None = None,\n279:     frame_duration_ms: int | None = None,\n280: ) -> str:\n281:     hints = []\n282:     if size:\n283:         hints.append(f\"输出图片尺寸为 {size}。\")\n284:     if quality:\n285:         hints.append(f\"输出图片质量为 {quality}。\")\n286:     # picture_v2 has no captured format selector; request GIF through the prompt.\n287:     if output_format == \"gif\":\n288:         options = normalize_image_options({\"output_format\": \"gif\", \"frame_count\": frame_count, \"frame_duration_ms\": frame_duration_ms})\n289:         hints.append(f\"输出动画 GIF，{options['frame_count']} 帧，每帧 {options['frame_duration_ms']} 毫秒。\")\n290:     return f\"{prompt.strip()}\\n\\n{''.join(hints)}\" if hints else prompt"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "utils/image_formats.py",
+    "start": 100,
+    "end": 118,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/utils/image_formats.py#L100-L118",
+    "text": "100: def prepare_image_output(payload: bytes, requested: str | None) -> tuple[bytes, str]:\n101:     actual = image_format(payload)\n102:     if requested in {\"gif\", \"svg\"}:\n103:         if actual != requested:\n104:             raise ValueError(f\"Upstream returned {actual}, not requested {requested}; no format fallback was applied\")\n105:         if requested == \"gif\":\n106:             with Image.open(io.BytesIO(payload)) as image:\n107:                 if getattr(image, \"n_frames\", 1) < 2:\n108:                     raise ValueError(\"Upstream returned a static GIF instead of an animation\")\n109:     elif requested and actual != requested:\n110:         if actual in {\"gif\", \"svg\"}:\n111:             raise ValueError(\"Refusing to flatten animated or vector output into a raster image\")\n112:         with Image.open(io.BytesIO(payload)) as image:\n113:             if getattr(image, \"n_frames\", 1) > 1:\n114:                 raise ValueError(\"Refusing to flatten animated output\")\n115:             output = io.BytesIO()\n116:             image.convert(\"RGB\" if requested == \"jpeg\" else \"RGBA\").save(output, format=requested.upper())\n117:             payload, actual = output.getvalue(), requested\n118:     return payload, actual"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "test/test_web_image26.py",
+    "start": 91,
+    "end": 110,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/test/test_web_image26.py#L91-L110",
+    "text": "91:     def test_native_web_gif_is_preserved_and_mismatch_fails_before_save(self):\n92:         for payload, success in [(raster(\"GIF\", True), True), (raster(), False), (raster(\"GIF\"), False)]:\n93:             with self.subTest(success=success):\n94:                 backend = mock.Mock()\n95:                 backend.resolve_conversation_image_urls.return_value = [\"http://upstream/image\"]\n96:                 backend.download_image_bytes.return_value = [payload]\n97:                 request = ConversationRequest(model=WEB_MODEL, prompt=\"animate\", output_format=\"gif\", frame_count=8)\n98:                 event = {\"conversation_id\": \"conv\", \"file_ids\": [\"file\"], \"text\": \"\"}\n99:                 with mock.patch.object(conversation, \"conversation_events\", return_value=iter([event])) as events, mock.patch.object(conversation, \"save_image_bytes\", return_value=\"http://app/a.gif\") as save, mock.patch.object(conversation, \"_remove_image_conversation_later\"):\n100:                     if success:\n101:                         outputs = list(conversation.stream_image_outputs(backend, request))\n102:                         self.assertEqual(outputs[0].data[0][\"mime_type\"], \"image/gif\")\n103:                         save.assert_called_once_with(payload, None)\n104:                     else:\n105:                         with self.assertRaises(ImageGenerationError) as caught:\n106:                             list(conversation.stream_image_outputs(backend, request))\n107:                         self.assertEqual(caught.exception.code, \"upstream_image_format_error\")\n108:                         save.assert_not_called()\n109:                     self.assertEqual(events.call_args.kwargs[\"frame_count\"], 8)\n110:                     self.assertEqual(events.call_args.kwargs[\"output_format\"], \"gif\")"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/protocol/conversation.py",
+    "start": 1388,
+    "end": 1392,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/protocol/conversation.py#L1388-L1392",
+    "text": "1388:             token = account_service.get_available_access_token(\n1389:                 plan_type=plan_type,\n1390:                 source_type=\"codex\" if codex_model else (\"chatgpt_web\" if request.model in IMAGE_26_MODELS else None),\n1391:                 plan_types=(\"plus\", \"team\", \"pro\") if codex_model and not plan_type else None,\n1392:             )"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/account_service.py",
+    "start": 256,
+    "end": 262,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/account_service.py#L256-L262",
+    "text": "256:     def _account_matches_source_type(cls, account: dict, source_type: str | None = None) -> bool:\n257:         if not source_type:\n258:             return True\n259:         # Web credentials can be imported via token, password or OAuth login.\n260:         if source_type == \"chatgpt_web\":\n261:             return cls._normalize_source_type(account.get(\"source_type\")) != \"codex\"\n262:         return cls._normalize_source_type(account.get(\"source_type\")) == cls._normalize_source_type(source_type)"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "test/test_web_image26.py",
+    "start": 76,
+    "end": 89,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/test/test_web_image26.py#L76-L89",
+    "text": "76:     def test_web_pool_never_selects_codex_account(self):\n77:         output = ImageOutput(kind=\"result\", model=WEB_MODEL, index=1, total=1, data=[{\"url\": \"http://app/a.gif\"}])\n78:         with mock.patch.object(conversation.account_service, \"get_available_access_token\", return_value=\"web-token\") as acquire, mock.patch.object(conversation.account_service, \"get_account\", return_value={}), mock.patch.object(conversation.account_service, \"mark_image_result\"), mock.patch.object(conversation, \"OpenAIBackendAPI\"), mock.patch.object(conversation, \"stream_image_outputs\", return_value=iter([output])), mock.patch.object(conversation, \"stream_codex_image_outputs\") as codex:\n79:             list(conversation.stream_image_outputs_with_pool(ConversationRequest(model=WEB_MODEL, output_format=\"gif\")))\n80:         acquire.assert_called_once_with(plan_type=None, source_type=\"chatgpt_web\", plan_types=None)\n81:         codex.assert_not_called()\n82: \n83:     def test_web_credentials_include_password_and_oauth_imports(self):\n84:         for source in (None, \"web\", \"password\", \"oauth_login\"):\n85:             self.assertTrue(AccountService._account_matches_source_type({\"source_type\": source}, \"chatgpt_web\"))\n86:             with mock.patch.object(openai_v1_models.OpenAIBackendAPI, \"list_models\", return_value={\"data\": []}), mock.patch.object(openai_v1_models.account_service, \"list_accounts\", return_value=[{\"source_type\": source}]):\n87:                 ids = {item[\"id\"] for item in openai_v1_models.list_models()[\"data\"]}\n88:             self.assertIn(WEB_MODEL, ids)\n89:         self.assertFalse(AccountService._account_matches_source_type({\"source_type\": \"codex\"}, \"chatgpt_web\"))"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "README.md",
+    "start": 107,
+    "end": 113,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/README.md#L107-L113",
+    "text": "107: - 网页账号：`gpt-image-2.6-sunburst`、`gpt-image-2.6-flare`，从现有非 Codex 号池取账号（含网页 Token、密码和 OAuth 导入），无需转为 Codex 凭据。\n108: - Codex 账号：`codex-gpt-image-2.6-sunburst`、`codex-gpt-image-2.6-flare`，以及对应的 `plus-`、`team-`、`pro-` 前缀别名。\n109: - `/v1/models` 根据号池来源和 Codex 套餐展示新模型，标记 `experimental: true` 和 `upstream`。\n110: \n111: **这是请求协议的实验适配，不代表全部账号已开放以上模型。** 官方 Image API 文档确认的能力，不等于 ChatGPT/Codex 账号具有同样的访问权限。上游不支持时明确报错，不偷偷切回旧模型或把 PNG 伪装成 GIF/SVG；不要手动把网页账号的来源改成 Codex。\n112: \n113: ChatGPT 网页链路参考 [b3346c9](https://github.com/FatalErrorR/chatgpt2api/commit/b3346c928595eb6e3abc346c6413994d66000005)：在网页会话准备和生成请求中直传完整 2.6 模型名，保留 `picture_v2`。网页协议尚无已抓取的格式参数，GIF 通过提示词请求动画、帧数和时长，实际格式仍校验为多帧 GIF；这不保证上游严格遵守帧数/时长。暂仅开放 PNG 和文生图 GIF，不开放网页 SVG、复杂度或 GIF 编辑。"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "test/test_web_image26.py",
+    "start": 26,
+    "end": 44,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/test/test_web_image26.py#L26-L44",
+    "text": "26:     def test_prepare_and_generation_both_use_exact_web_slug(self):\n27:         backend = OpenAIBackendAPI.__new__(OpenAIBackendAPI)\n28:         backend.base_url = \"https://chatgpt.com\"\n29:         backend.session = mock.Mock()\n30:         backend.session.post.return_value.status_code = 200\n31:         backend.session.post.return_value.json.return_value = {\"conduit_token\": \"conduit\"}\n32:         with mock.patch.object(backend, \"_image_headers\", return_value={}):\n33:             requirements = ChatRequirements(token=\"requirements\")\n34:             self.assertEqual(backend._prepare_image_conversation(\"animate\", requirements, WEB_MODEL), \"conduit\")\n35:             backend._start_image_generation(\"animate\", requirements, \"conduit\", WEB_MODEL)\n36:         calls = backend.session.post.call_args_list\n37:         self.assertEqual(calls[0].args[0], \"https://chatgpt.com/backend-api/f/conversation/prepare\")\n38:         self.assertEqual(calls[1].args[0], \"https://chatgpt.com/backend-api/f/conversation\")\n39:         for call in calls:\n40:             payload = call.kwargs[\"json\"]\n41:             self.assertEqual(payload[\"model\"], WEB_MODEL)\n42:             self.assertEqual(payload[\"system_hints\"], [\"picture_v2\"])\n43:             self.assertNotIn(\"output_format\", payload)\n44:             self.assertNotIn(\"frame_count\", payload)"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "utils/image_formats.py",
+    "start": 76,
+    "end": 96,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/utils/image_formats.py#L76-L96",
+    "text": "76:     if output_format in {\"gif\", \"svg\"} and (fields.get(\"stream\") or fields.get(\"partial_images\") is not None or fields.get(\"output_compression\") is not None):\n77:         invalid(\"GIF/SVG output does not support stream, partial_images or output_compression\")\n78:     if output_format not in {\"gif\", \"svg\"} and fields.get(\"output_compression\") is not None:\n79:         invalid(\"output_compression is not supported by the account-pool image protocol\")\n80:     for key, default, minimum, maximum in ((\"frame_count\", 9, 2, 16), (\"frame_duration_ms\", 200, 20, 2000)):\n81:         raw = fields.get(key)\n82:         if raw is not None and output_format != \"gif\":\n83:             invalid(f\"{key} is only supported for GIF output\")\n84:         if output_format == \"gif\":\n85:             try:\n86:                 value = int(str(default if raw is None else raw))\n87:             except (ValueError, TypeError):\n88:                 invalid(f\"{key} must be an integer\")\n89:             if not minimum <= value <= maximum:\n90:                 invalid(f\"{key} must be between {minimum} and {maximum}\")\n91:             options[key] = ((value + 5) // 10) * 10 if key == \"frame_duration_ms\" else value\n92:     size = str(fields.get(\"size\") or \"auto\")\n93:     if output_format == \"gif\" and size != \"auto\":\n94:         match = re.fullmatch(r\"([1-9]\\d*)x([1-9]\\d*)\", size)\n95:         if not match or any(int(part) % 16 for part in match.groups()):\n96:             invalid(\"GIF size dimensions must be positive multiples of 16; use auto otherwise\")"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "services/image_storage_service.py",
+    "start": 225,
+    "end": 245,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/services/image_storage_service.py#L225-L245",
+    "text": "225:     def make_relative_path(self, image_data: bytes) -> str:\n226:         file_hash = hashlib.md5(image_data).hexdigest()\n227:         extension = image_format(image_data)\n228:         filename = f\"{int(time.time())}_{file_hash}.{extension}\"\n229:         relative_dir = Path(time.strftime(\"%Y\"), time.strftime(\"%m\"), time.strftime(\"%d\"))\n230:         return f\"{relative_dir.as_posix()}/{filename}\"\n231: \n232:     def save(self, image_data: bytes, base_url: str | None = None) -> StoredImage:\n233:         rel = self.make_relative_path(image_data)\n234:         mode = self.mode()\n235:         if mode not in {\"local\", \"webdav\", \"both\"}:\n236:             mode = \"local\"\n237:         stored_local = mode in {\"local\", \"both\"}\n238:         stored_webdav = False\n239:         remote_url = \"\"\n240: \n241:         if mode in {\"webdav\", \"both\"}:\n242:             remote_url = WebDAVClient(self.settings()).put(rel, image_data, IMAGE_MIME_TYPES[image_format(image_data)])\n243:             stored_webdav = True\n244: \n245:         dimensions = _image_dimensions(image_data)"
+  },
+  {
+    "repo": "gkingt/chatgpt2api",
+    "sha": "8c319b2f2319b5111e03ea6ea33a579d7887b81d",
+    "path": "test/test_image26.py",
+    "start": 185,
+    "end": 205,
+    "url": "https://github.com/gkingt/chatgpt2api/blob/8c319b2f2319b5111e03ea6ea33a579d7887b81d/test/test_image26.py#L185-L205",
+    "text": "185: \n186:     def test_task_options_and_result_metadata_survive_reload(self):\n187:         with tempfile.TemporaryDirectory() as directory:\n188:             path = Path(directory) / \"tasks.json\"\n189:             seen = []\n190:             def handler(payload):\n191:                 seen.append(payload)\n192:                 return {\"data\": [{\"url\": \"http://app/a.gif\", \"mime_type\": \"image/gif\", \"output_format\": \"gif\"}]}\n193:             service = ImageTaskService(path, generation_handler=handler, retention_days_getter=lambda: 30)\n194:             with mock.patch.object(service, \"_log_call\"):\n195:                 service.submit_generation(OWNER, client_task_id=\"gif\", prompt=\"animation\", model=MODEL, size=\"auto\", output_format=\"gif\", frame_count=8, frame_duration_ms=205, complexity=\"low\")\n196:                 wait_for_task(service, OWNER, \"gif\", \"success\")\n197:             reloaded = ImageTaskService(path, retention_days_getter=lambda: 30)\n198:             task = reloaded.list_tasks(OWNER, [\"gif\"])[\"items\"][0]\n199:             self.assertEqual(task[\"output_format\"], \"gif\")\n200:             self.assertEqual(task[\"frame_duration_ms\"], 210)\n201:             self.assertEqual(task[\"frame_count\"], 8)\n202:             self.assertEqual(task[\"complexity\"], \"low\")\n203:             self.assertEqual(task[\"data\"][0][\"mime_type\"], \"image/gif\")\n204:             self.assertEqual(seen[0][\"output_format\"], \"gif\")\n205: "
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/protocol/conversation.py",
+    "start": 248,
+    "end": 263,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/protocol/conversation.py#L248-L263",
+    "text": "248:     quality: str = \"auto\",\n249:     output_format: str = \"png\",\n250:     frame_count: object = None,\n251:     frame_duration_ms: object = None,\n252: ) -> str:\n253:     hints = []\n254:     if size:\n255:         hints.append(f\"输出图片尺寸为 {size}。\")\n256:     if quality:\n257:         hints.append(f\"输出图片质量为 {quality}。\")\n258:     # ponytail: web picture_v2 has no output_format; this sentence is the only GIF signal until a captured 2.6 payload exists\n259:     if str(output_format or \"\").lower() == \"gif\":\n260:         hints.append(\n261:             f\"输出动画 GIF，{gif_frame_count(frame_count)} 帧，每帧 {gif_frame_duration_ms(frame_duration_ms)} 毫秒。\"\n262:         )\n263:     return f\"{prompt.strip()}\\n\\n{''.join(hints)}\" if hints else prompt"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/protocol/conversation.py",
+    "start": 331,
+    "end": 365,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/protocol/conversation.py#L331-L365",
+    "text": "331: def format_image_result(\n332:     items: list[dict[str, Any]],\n333:     prompt: str,\n334:     response_format: str,\n335:     base_url: str | None = None,\n336:     created: int | None = None,\n337:     message: str = \"\",\n338:     size: str | None = None,\n339: ) -> dict[str, Any]:\n340:     data: list[dict[str, Any]] = []\n341:     for item in items:\n342:         b64_json = str(item.get(\"b64_json\") or \"\").strip()\n343:         if not b64_json:\n344:             continue\n345:         revised_prompt = str(item.get(\"revised_prompt\") or prompt).strip() or prompt\n346:         image_bytes = base64.b64decode(b64_json)\n347:         upscaled = image_bytes if is_gif_bytes(image_bytes) else maybe_upscale_image(image_bytes, size)\n348:         if upscaled is not image_bytes:\n349:             image_bytes = upscaled\n350:             b64_json = base64.b64encode(image_bytes).decode(\"ascii\")\n351:         if response_format == \"b64_json\":\n352:             data.append({\n353:                 \"b64_json\": b64_json,\n354:                 \"url\": save_image_bytes(image_bytes, base_url),\n355:                 \"revised_prompt\": revised_prompt,\n356:             })\n357:         else:\n358:             data.append({\n359:                 \"url\": save_image_bytes(image_bytes, base_url),\n360:                 \"revised_prompt\": revised_prompt,\n361:             })\n362:     result: dict[str, Any] = {\"created\": created or int(time.time()), \"data\": data}\n363:     if message and not data:\n364:         result[\"message\"] = message\n365:     return result"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "utils/helper.py",
+    "start": 181,
+    "end": 197,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/utils/helper.py#L181-L197",
+    "text": "181: def is_gif_bytes(data: bytes) -> bool:\n182:     return data.startswith((b\"GIF87a\", b\"GIF89a\"))\n183: \n184: \n185: def _gif_int(value: object, default: int) -> int:\n186:     try:\n187:         return int(str(value).strip())\n188:     except (TypeError, ValueError):\n189:         return default\n190: \n191: \n192: def gif_frame_count(value: object) -> int:\n193:     return min(64, max(2, _gif_int(value, 9)))\n194: \n195: \n196: def gif_frame_duration_ms(value: object) -> int:\n197:     duration = min(2000, max(20, _gif_int(value, 200)))"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "test/test_gif_output.py",
+    "start": 15,
+    "end": 37,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/test/test_gif_output.py#L15-L37",
+    "text": "15: GIF = base64.b64decode(\"R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\")\n16: \n17: \n18: class GifRequestTests(unittest.TestCase):\n19:     def test_frame_fields_use_official_bounds(self) -> None:\n20:         self.assertEqual(gif_frame_count(None), 9)\n21:         self.assertEqual(gif_frame_count(1), 2)\n22:         self.assertEqual(gif_frame_count(99), 64)\n23:         self.assertEqual(gif_frame_duration_ms(None), 200)\n24:         self.assertEqual(gif_frame_duration_ms(25), 20)\n25:         self.assertEqual(gif_frame_duration_ms(5000), 2000)\n26: \n27:     def test_web_prompt_states_gif_timing(self) -> None:\n28:         prompt = conversation.build_image_prompt(\"a lantern\", \"1024x1024\", \"low\", \"gif\", 9, 200)\n29:         self.assertIn(\"输出动画 GIF，9 帧，每帧 200 毫秒。\", prompt)\n30: \n31:     def test_gif_bytes_skip_upscale(self) -> None:\n32:         items = [{\"b64_json\": base64.b64encode(GIF).decode(\"ascii\")}]\n33:         saved: list[bytes] = []\n34:         with mock.patch.object(conversation, \"save_image_bytes\", side_effect=lambda data, base_url=None: saved.append(data) or \"u\"), \\\n35:                 mock.patch.object(conversation, \"maybe_upscale_image\", side_effect=AssertionError(\"gif was resized\")):\n36:             conversation.format_image_result(items, \"p\", \"b64_json\", size=\"1024x1024\")\n37:         self.assertEqual(saved, [GIF])"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/image_storage_service.py",
+    "start": 134,
+    "end": 138,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/image_storage_service.py#L134-L138",
+    "text": "134:     def put(self, rel: str, payload: bytes, content_type: str = \"image/png\") -> str:\n135:         self.ensure_dirs(rel)\n136:         url = self.remote_url(rel)\n137:         self._request(\"PUT\", url, data=payload, headers={\"Content-Type\": content_type})\n138:         return url"
+  },
+  {
+    "repo": "FatalErrorR/chatgpt2api",
+    "sha": "53119b5c4682c5606c9b4c80ad9d76d64105686e",
+    "path": "services/image_storage_service.py",
+    "start": 222,
+    "end": 230,
+    "url": "https://github.com/FatalErrorR/chatgpt2api/blob/53119b5c4682c5606c9b4c80ad9d76d64105686e/services/image_storage_service.py#L222-L230",
+    "text": "222:         if mode in {\"local\", \"both\"}:\n223:             path = _local_image_path(rel)\n224:             path.parent.mkdir(parents=True, exist_ok=True)\n225:             path.write_bytes(image_data)\n226:             stored_local = True\n227: \n228:         if mode in {\"webdav\", \"both\"}:\n229:             remote_url = WebDAVClient(self.settings()).put(rel, image_data)\n230:             stored_webdav = True"
+  },
+  {
+    "repo": "gxyo/chatgpt2api",
+    "sha": "65302d7a19ca77eafd28cd3bdedabf741865820a",
+    "path": "services/openai_backend_api.py",
+    "start": 811,
+    "end": 828,
+    "url": "https://github.com/gxyo/chatgpt2api/blob/65302d7a19ca77eafd28cd3bdedabf741865820a/services/openai_backend_api.py#L811-L828",
+    "text": "811:     def _image_model_settings(self, model: str) -> tuple[str, str]:\n812:         \"\"\"把标准图片模型名映射为上游模型及思考强度。\"\"\"\n813:         _, base_model = split_image_model(model)\n814:         if not base_model:\n815:             return \"auto\", \"\"\n816:         if base_model in {\"gpt-image-2\", \"gpt-image-2.5\", \"gpt-image-2.6\", \"gpt-image-2.6-flare\", \"gpt-image-2.6-sunburst\", \"gpt-image-2.5-sunburst\", \"gpt-image-2.5-flare\"}:\n817:             upstream_model = config.default_upstream_model_name\n818:         elif base_model == CODEX_IMAGE_MODEL:\n819:             upstream_model = base_model\n820:         else:\n821:             return \"auto\", \"\"\n822:         model_name, separator, suffix = upstream_model.rpartition(\"-\")\n823:         normalized_suffix = suffix.lower()\n824:         if separator and normalized_suffix in {\"standard\", \"extended\", \"max\"}:\n825:             return model_name, normalized_suffix\n826:         if separator and normalized_suffix == \"thinking\":\n827:             upstream_model = model_name\n828:         return upstream_model, self._normalize_thinking_effort(config.default_thinking_effort)"
+  },
+  {
+    "repo": "gxyo/chatgpt2api",
+    "sha": "65302d7a19ca77eafd28cd3bdedabf741865820a",
+    "path": "test/test_image_gif_result.py",
+    "start": 14,
+    "end": 15,
+    "url": "https://github.com/gxyo/chatgpt2api/blob/65302d7a19ca77eafd28cd3bdedabf741865820a/test/test_image_gif_result.py#L14-L15",
+    "text": "14: GIF_BYTES = b\"GIF89a\\x01\\x00\\x01\\x00\\x00\\x00\\x00;\"\n15: PNG_BYTES = b\"\\x89PNG\\r\\n\\x1a\\n\" + b\"\\x00\" * 16"
+  },
+  {
+    "repo": "hp0912/chatgpt2api",
+    "sha": "e5bae8714da06c4e3676dd00d04bd56266c35d64",
+    "path": "README.md",
+    "start": 129,
+    "end": 130,
+    "url": "https://github.com/hp0912/chatgpt2api/blob/e5bae8714da06c4e3676dd00d04bd56266c35d64/README.md#L129-L130",
+    "text": "129: - 支持 `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`、`gpt-image-2.6-flare` 和 `gpt-image-2.6-sunburst`：普通名称通过官网链路原样传递模型 ID；对应 `codex-` 别名通过 Codex 链路设置图片工具的模型。\n130:   Codex 别名也支持 `plus-`、`team-`、`pro-` 前缀，仅使用对应来源和订阅的账号。模型列表与画图工作台按已有账号展示这些名称；上游实际可用性取决于账号权限，官网对新模型 ID 的接受情况尚未实测。"
+  },
+  {
+    "repo": "IFuZYI/chatgpt2api",
+    "sha": "af7bef567604877e0e6d452c64ed4d6ee8208004",
+    "path": "docs/feature-status.md",
+    "start": 77,
+    "end": 85,
+    "url": "https://github.com/IFuZYI/chatgpt2api/blob/af7bef567604877e0e6d452c64ed4d6ee8208004/docs/feature-status.md#L77-L85",
+    "text": "77: | `gpt-image-2.6` | ✅ | ChatGPT Images 2.6；模型名直接作为上游 slug 透传 |\n78: | `gpt-image-2.6-flare` | ✅ | 同上 |\n79: | `gpt-image-2.6-sunburst` | ✅ | 同上 |\n80: | `codex-gpt-image-2` | ⚠️ | Codex 链路专用，带套餐前缀别名；响应格式待真实上游验证（ADR-0010） |\n81: \n82: 2.5 系列三个变体在同 prompt 下产出字节数各不相同（839KB / 853KB / 943KB，\n83: 均 1254×1254），确认是不同模型而非别名。2.6 系列于 2026-11 发布：\n84: ChatGPT 侧为 Images 2.6，API 侧提供 `gpt-image-2.6-flare` /\n85: `gpt-image-2.6-sunburst` 两个变体；三个模型均已实测出图成功。"
+  },
+  {
+    "repo": "Micah123321/chatgpt2api",
+    "sha": "663175e6e0f2014e47ab324c7c3fbcf354c580e2",
+    "path": "services/openai_backend_api.py",
+    "start": 684,
+    "end": 697,
+    "url": "https://github.com/Micah123321/chatgpt2api/blob/663175e6e0f2014e47ab324c7c3fbcf354c580e2/services/openai_backend_api.py#L684-L697",
+    "text": "684:     def _image_model_slug(self, model: str) -> str:\n685:         \"\"\"把标准图片模型名映射到底层 model slug。\"\"\"\n686:         _, base_model = split_image_model(model)\n687:         if not base_model:\n688:             return \"auto\"\n689:         if base_model == \"gpt-image-2.6\":\n690:             return \"gpt-image-2.6-flare\"\n691:         if base_model == \"gpt-image-2.5\":\n692:             return \"gpt-image-2.5-flare\"\n693:         if base_model == \"gpt-image-2\":\n694:             return \"gpt-5-5-thinking\"\n695:         if base_model == CODEX_IMAGE_MODEL:\n696:             return base_model\n697:         return base_model"
+  },
+  {
+    "repo": "orangewoker/chatgpt2api-h",
+    "sha": "d1e8ed4a0607abd101e079ae9e9d4f8f83297dce",
+    "path": "services/openai_backend_api.py",
+    "start": 775,
+    "end": 808,
+    "url": "https://github.com/orangewoker/chatgpt2api-h/blob/d1e8ed4a0607abd101e079ae9e9d4f8f83297dce/services/openai_backend_api.py#L775-L808",
+    "text": "775:     def iter_codex_image_response_events(\n776:             self,\n777:             prompt: str,\n778:             images: list[str] | None = None,\n779:             size: str | None = None,\n780:             quality: str = \"auto\",\n781:             model: str = \"codex-gpt-image-2\",\n782:             output_format: str = \"png\",\n783:             frame_count: int | None = None,\n784:             frame_duration_ms: int | None = None,\n785:     ) -> Iterator[Dict[str, Any]]:\n786:         if not self.access_token:\n787:             raise RuntimeError(\"access_token is required for codex image endpoints\")\n788:         self._ensure_codex_source_account()\n789:         output_format, frame_count, frame_duration_ms = normalize_image_output(output_format, frame_count, frame_duration_ms)\n790:         if images and output_format == \"gif\":\n791:             raise ValueError(\"GIF output is not supported for image edits\")\n792:         path = \"/backend-api/codex/responses\"\n793:         payload = {\n794:             \"model\": CODEX_RESPONSES_MODEL,\n795:             \"instructions\": CODEX_RESPONSES_INSTRUCTIONS,\n796:             \"store\": False,\n797:             \"input\": self._codex_image_input(prompt, images or []),\n798:             \"tools\": [{\n799:                 \"type\": \"image_generation\",\n800:                 \"model\": codex_tool_model(model),\n801:                 \"action\": \"edit\" if images else \"generate\",\n802:                 \"size\": str(size or \"1024x1024\"),\n803:                 \"quality\": str(quality or \"auto\"),\n804:                 \"output_format\": output_format,\n805:                 **({\"frame_count\": frame_count, \"frame_duration_ms\": frame_duration_ms} if output_format == \"gif\" else {}),\n806:             }],\n807:             \"tool_choice\": {\"type\": \"image_generation\"},\n808:             \"stream\": True,"
+  },
+  {
+    "repo": "fengqiaozhu/chatgpt2api",
+    "sha": "bc779d03296138744a2d798b0dd64eefeaa5a8a1",
+    "path": "services/openai_backend_api.py",
+    "start": 798,
+    "end": 824,
+    "url": "https://github.com/fengqiaozhu/chatgpt2api/blob/bc779d03296138744a2d798b0dd64eefeaa5a8a1/services/openai_backend_api.py#L798-L824",
+    "text": "798:     def iter_codex_image_response_events(\n799:             self,\n800:             prompt: str,\n801:             images: list[str] | None = None,\n802:             size: str | None = None,\n803:             quality: str = \"auto\",\n804:             image_model: str = \"gpt-image-2\",\n805:     ) -> Iterator[Dict[str, Any]]:\n806:         if not self.access_token:\n807:             raise RuntimeError(\"access_token is required for codex image endpoints\")\n808:         self._ensure_codex_source_account()\n809:         path = \"/backend-api/codex/responses\"\n810:         payload = {\n811:             \"model\": CODEX_RESPONSES_MODEL,\n812:             \"instructions\": CODEX_RESPONSES_INSTRUCTIONS,\n813:             \"store\": False,\n814:             \"input\": self._codex_image_input(prompt, images or []),\n815:             \"tools\": [{\n816:                 \"type\": \"image_generation\",\n817:                 \"model\": str(image_model or \"gpt-image-2\"),\n818:                 \"action\": \"edit\" if images else \"generate\",\n819:                 \"size\": str(size or \"1024x1024\"),\n820:                 \"quality\": normalize_codex_image_quality(str(image_model or \"gpt-image-2\"), quality),\n821:                 \"output_format\": \"png\",\n822:             }],\n823:             \"tool_choice\": {\"type\": \"image_generation\"},\n824:             \"stream\": True,"
+  },
+  {
+    "repo": "AstonChenDev/chatgpt2api",
+    "sha": "cc558d281da07d7d90bc840cf92bc3176334c148",
+    "path": "services/openai_backend_api.py",
+    "start": 908,
+    "end": 935,
+    "url": "https://github.com/AstonChenDev/chatgpt2api/blob/cc558d281da07d7d90bc840cf92bc3176334c148/services/openai_backend_api.py#L908-L935",
+    "text": "908:     def iter_codex_image_response_events(\n909:             self,\n910:             prompt: str,\n911:             images: list[str] | None = None,\n912:             size: str | None = None,\n913:             quality: str = \"auto\",\n914:             model: str = CODEX_IMAGE_MODEL,\n915:     ) -> Iterator[Dict[str, Any]]:\n916:         if not self.access_token:\n917:             raise RuntimeError(\"access_token is required for codex image endpoints\")\n918:         self._ensure_codex_source_account()\n919:         path = \"/backend-api/codex/responses\"\n920:         payload = {\n921:             \"model\": CODEX_RESPONSES_MODEL,\n922:             \"instructions\": CODEX_RESPONSES_INSTRUCTIONS,\n923:             \"store\": False,\n924:             \"input\": self._codex_image_input(prompt, images or []),\n925:             \"tools\": [{\n926:                 \"type\": \"image_generation\",\n927:                 \"model\": codex_image_tool_model(model),\n928:                 \"action\": \"edit\" if images else \"generate\",\n929:                 \"size\": str(size or \"1024x1024\"),\n930:                 \"quality\": str(quality or \"auto\"),\n931:                 \"output_format\": \"png\",\n932:             }],\n933:             \"tool_choice\": {\"type\": \"image_generation\"},\n934:             \"stream\": True,\n935:         }"
+  }
+]

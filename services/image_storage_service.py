@@ -19,7 +19,7 @@ from utils.image_format import inspect_image
 
 IMAGE_INDEX_FILE = DATA_DIR / "image_index.json"
 IMAGE_INDEX_LOCK = Lock()
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
 class ImageStorageError(RuntimeError):
@@ -200,15 +200,21 @@ class ImageStorageService:
     def make_relative_path(self, image_data: bytes) -> str:
         file_hash = hashlib.md5(image_data).hexdigest()
         info = inspect_image(image_data)
-        extension = info.extension if info is not None and info.supported_static else ".png"
+        extension = info.extension if info is not None and (info.supported_static or info.supported_animation) else ".png"
         filename = f"{int(time.time())}_{file_hash}{extension}"
         relative_dir = Path(time.strftime("%Y"), time.strftime("%m"), time.strftime("%d"))
         return f"{relative_dir.as_posix()}/{filename}"
 
     def save(self, image_data: bytes, base_url: str | None = None) -> StoredImage:
         info = inspect_image(image_data)
-        if info is not None and not info.supported_static:
-            raise ImageStorageError("当前图片存储仅支持静态 PNG/JPEG/WebP，不能丢弃动画帧")
+        if info is None and image_data[:6] in {b"GIF87a", b"GIF89a"}:
+            raise ImageStorageError("GIF 文件损坏，不能将其伪装成 PNG 保存")
+        if info is not None and info.format == "GIF":
+            info = inspect_image(image_data, verify=True)
+            if info is None or not info.supported_animation:
+                raise ImageStorageError("GIF 必须是可完整解码的多帧动画，不能丢弃动画帧")
+        elif info is not None and not info.supported_static:
+            raise ImageStorageError("当前图片存储支持静态 PNG/JPEG/WebP 和多帧 GIF，不能丢弃动画帧")
         mime_type = info.mime_type if info is not None else "image/png"
         config.cleanup_old_images()
         rel = self.make_relative_path(image_data)
@@ -245,6 +251,8 @@ class ImageStorageService:
         }
         if dimensions:
             item["width"], item["height"] = dimensions
+        if info is not None and info.supported_animation:
+            item.update(info.animation_metadata)
         with self._index_lock:
             items = self._load_clean_index()
             items[rel] = item

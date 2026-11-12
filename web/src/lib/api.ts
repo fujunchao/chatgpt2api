@@ -1,4 +1,5 @@
 import { httpRequest, request } from "@/lib/request";
+import type { ImageOutputFormat } from "@/lib/image-models";
 
 export type AccountType = string;
 export type AccountStatus = "正常" | "限流" | "异常" | "禁用";
@@ -166,6 +167,8 @@ export type SettingsConfig = {
   refresh_account_interval_minute?: number | string;
   image_retention_days?: number | string;
   image_poll_timeout_secs?: number | string;
+  image_web_gif_enabled?: boolean;
+  image_gif_poll_timeout_secs?: number | string;
   image_account_concurrency?: number | string;
   image_parallel_generation?: boolean;
   image_settle_enabled?: boolean;
@@ -282,9 +285,30 @@ export type ImageUsage = {
   output_tokens_details?: Record<string, number>;
 };
 
+export type ImageResultData = {
+  b64_json?: string;
+  url?: string;
+  revised_prompt?: string;
+  format?: string;
+  output_format?: ImageOutputFormat;
+  mime_type?: string;
+  animated?: boolean;
+  frame_count?: number;
+  frame_durations_ms?: number[];
+  /** 动画播放时长；生成耗时位于任务的 duration_ms。 */
+  duration_ms?: number;
+  loop?: number | null;
+};
+
+export type ImageOutputOptions = {
+  output_format?: ImageOutputFormat;
+  frame_count?: number;
+  frame_duration_ms?: number;
+};
+
 export type ImageResponse = {
   created: number;
-  data: Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
+  data: ImageResultData[];
   usage?: ImageUsage;
   usage_source?: ImageUsageSource;
 };
@@ -296,10 +320,13 @@ export type ImageTask = {
   model?: ImageModel;
   size?: string;
   quality?: string;
+  output_format?: ImageOutputFormat;
+  frame_count?: number;
+  frame_duration_ms?: number;
   created_at: string;
   updated_at: string;
   conversation_id?: string;
-  data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
+  data?: ImageResultData[];
   error?: string;
   progress?: string;
   elapsed_secs?: number;
@@ -472,7 +499,7 @@ export async function updateAccount(
   });
 }
 
-export async function generateImage(prompt: string, model?: ImageModel, size?: string, quality = "auto") {
+export async function generateImage(prompt: string, model?: ImageModel, size?: string, quality = "auto", options: ImageOutputOptions = {}) {
   return httpRequest<ImageResponse>(
     "/v1/images/generations",
     {
@@ -484,12 +511,19 @@ export async function generateImage(prompt: string, model?: ImageModel, size?: s
         quality,
         n: 1,
         response_format: "b64_json",
+        ...options,
       },
     },
   );
 }
 
-export async function editImage(files: File | File[], prompt: string, model?: ImageModel, size?: string, quality = "auto") {
+function appendImageOutputOptions(formData: FormData, options: ImageOutputOptions) {
+  if (options.output_format) formData.append("output_format", options.output_format);
+  if (options.frame_count != null) formData.append("frame_count", String(options.frame_count));
+  if (options.frame_duration_ms != null) formData.append("frame_duration_ms", String(options.frame_duration_ms));
+}
+
+export async function editImage(files: File | File[], prompt: string, model?: ImageModel, size?: string, quality = "auto", options: ImageOutputOptions = {}) {
   const formData = new FormData();
   const uploadFiles = Array.isArray(files) ? files : [files];
 
@@ -505,6 +539,7 @@ export async function editImage(files: File | File[], prompt: string, model?: Im
   }
   formData.append("quality", quality);
   formData.append("n", "1");
+  appendImageOutputOptions(formData, options);
 
   return httpRequest<ImageResponse>(
     "/v1/images/edits",
@@ -515,7 +550,7 @@ export async function editImage(files: File | File[], prompt: string, model?: Im
   );
 }
 
-export async function createImageGenerationTask(clientTaskId: string, prompt: string, model?: ImageModel, size?: string, quality = "auto") {
+export async function createImageGenerationTask(clientTaskId: string, prompt: string, model?: ImageModel, size?: string, quality = "auto", options: ImageOutputOptions = {}) {
   return httpRequest<ImageTask>("/api/image-tasks/generations", {
     method: "POST",
     body: {
@@ -524,6 +559,7 @@ export async function createImageGenerationTask(clientTaskId: string, prompt: st
       ...(model ? { model } : {}),
       ...(size ? { size } : {}),
       quality,
+      ...options,
     },
   });
 }
@@ -535,6 +571,7 @@ export async function createImageEditTask(
   model?: ImageModel,
   size?: string,
   quality = "auto",
+  options: ImageOutputOptions = {},
 ) {
   const formData = new FormData();
   const uploadFiles = Array.isArray(files) ? files : [files];
@@ -551,6 +588,7 @@ export async function createImageEditTask(
     formData.append("size", size);
   }
   formData.append("quality", quality);
+  appendImageOutputOptions(formData, options);
 
   return httpRequest<ImageTask>("/api/image-tasks/edits", {
     method: "POST",
@@ -565,6 +603,11 @@ export async function fetchImageTasks(ids: string[]) {
   }
   params.set("_t", String(Date.now()));
   return httpRequest<ImageTaskListResponse>(`/api/image-tasks?${params.toString()}`);
+}
+
+/** 用户图片页读取能力开关，无需访问管理员的系统配置。 */
+export async function fetchImageCapabilities() {
+  return httpRequest<{ web_gif_enabled: boolean; gif_poll_timeout_secs: number }>("/api/image-capabilities");
 }
 
 export async function resumeImagePoll(taskId: string, extraTimeoutSecs = 30) {
