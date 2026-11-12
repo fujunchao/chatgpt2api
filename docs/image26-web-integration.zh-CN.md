@@ -1,0 +1,81 @@
+# v0.16.4：Image 2.6 网页账号接入
+
+本版本通过现有 ChatGPT 网页账号接入 Image 2.6，使用网页 `picture_v2` 图片会话。两个具体变体在准备和提交请求中均保留完整型号；短名由本项目固定映射。
+
+## 模型与账号
+
+| 客户端模型 | 实际网页请求型号 | 说明 |
+| --- | --- | --- |
+| `gpt-image-2.6-sunburst` | `gpt-image-2.6-sunburst` | 请求 Sunburst |
+| `gpt-image-2.6-flare` | `gpt-image-2.6-flare` | 请求 Flare |
+| `gpt-image-2.6` | `gpt-image-2.6-sunburst` | 本地固定短名 |
+
+三项入口使用网页 Token、密码登录或内置 OAuth 网页登录来源，包括按既有规则识别的缺省网页来源。账号需满足健康状态与图片额度要求；具体变体权限以上游实际响应为准。`/v1/models` 的条目来自可用网页账号，目录可见性不代表所有账号都获得同一变体权限。
+
+原有 `gpt-image-2`、裸 `gpt-image-2.5` 继续使用网页自动路由；2.5 的 Codex 变体保留原有路由和套餐条件。2.6 的三个入口均使用网页会话。
+
+## 调用示例
+
+文生图使用本项目 `/v1/images/generations`：
+
+```json
+{
+  "model": "gpt-image-2.6-flare",
+  "prompt": "纯白背景中央的红色正方形",
+  "n": 1,
+  "quality": "auto",
+  "response_format": "b64_json"
+}
+```
+
+参考图编辑使用 `/v1/images/edits`，可沿用 multipart 文件上传或已有 JSON 参考图格式；设置相同的 `model` 即可。生成数量 `n` 为 1–4。Chat 图片模式、Responses 图片工具兼容入口和后台任务复用相同网页管线。
+
+Responses 图片工具示例：
+
+```json
+{
+  "model": "gpt-5",
+  "input": "纯白背景中央的蓝色圆形",
+  "tools": [{"type": "image_generation", "model": "gpt-image-2.6-sunburst"}]
+}
+```
+
+这里顶层名称是兼容响应中的对话模型，工具中的名称选择实际网页图片型号。
+
+## 参数与返回
+
+- 网页质量提示支持 `auto/low/medium/high`；尺寸提示可为 `auto` 或 `WIDTHxHEIGHT`。实际返回分辨率和质量由上游决定。
+- 首期接收静态 PNG、JPEG、WebP，保留原始字节、正确后缀与媒体类型；下载及继续编辑沿用实际格式。
+- 网页原生 `output_format`、GIF 帧参数、SVG、复杂度等控制尚未开放。明确填写未支持字段会在发送请求前报错，包括 Responses 顶层和工具内字段。
+- 动画、SVG 或未知输出格式会明确报错，不转换成静态 PNG，不因结果格式失败重复生成。
+- 没有可确认的上游数字用量时省略 `usage`，返回 `usage_source="unavailable"`，界面显示不可用。
+
+## 故障与继续等待
+
+网页型号权限拒绝保留上游状态及错误字段。只有能够确认尚未提交的型号拒绝，才会保持同一型号有限尝试其他网页账号；整个 HTTP 多图请求最多 3 次型号权限试用。
+
+提交后连接中断或连接重置按本次客户端消息 ID 恢复，避免重复生成。提交状态无法确认且找不到对应会话时明确失败。准备阶段及明确的 TLS 握手失败保持原有安全重试。
+
+超时任务的“继续等待”保存原会话与原账号的不可逆摘要，服务重启后可以继续读取原会话。任务记录不保存网页凭据；恢复结果经过相同的静态格式和用量处理。旧版本任务缺少恢复摘要、原账号已不存在或已变为其它来源时会明确失败。若账号令牌在同一进程中轮换，可通过既有别名恢复；重启后原摘要无法匹配新令牌时也会明确失败。
+
+## 验证记录
+
+- 213 项后端离线回归通过，覆盖新模型、Free/OAuth 来源、旧模型、各兼容入口、参数、用量、任务、跨重启恢复、存储及提交中断。
+- 7 项前端逻辑测试、独立 TypeScript 类型检查与前端生产构建通过。
+- 对业务源码 `382792116d45d1b8b07197906eadbcdb9375e51a` 的规范与需求两轴审查均为 0 项剩余问题。
+- 真实 Free/OAuth 网页账号完成两变体生成、两变体参考图编辑和短名映射五项验收，均返回 PNG，每项只提交一次。参考图的颜色变化已通过目视核对。
+
+实测仅覆盖此次 Free/OAuth 账号，付费网页账号未实测；会话元数据匹配请求型号，独立底层引擎身份未认证。精确尺寸、耗时、图片哈希和回归边界见 [网页发布验收](research/image26-web-acceptance-2026-11-12.zh-CN.md)。
+
+## 升级
+
+镜像：`ghcr.io/fujunchao/chatgpt2api:0.16.4`，支持 `linux/amd64`、`linux/arm64`。
+
+```bash
+docker compose pull app
+docker compose up -d --no-deps app
+```
+
+保留现有 `config.json` 与 `data/`。升级后确认面板版本 `0.16.4`，重新获取模型目录并选择对应网页变体。默认 Compose 文件已固定到本版本；本地源码构建也可沿用 `docker-compose.image25.yml`。
+
+上游及 fork 依据见 [完整调研](image26-research-2026-11-12.zh-CN.md) 与 [七个网页实现证据](research/image26-web-channel-evidence.zh-CN.md)。

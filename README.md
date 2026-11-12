@@ -17,6 +17,12 @@
 
 ## 快速开始
 
+### v0.16.4：网页 Image 2.6
+
+新增 `gpt-image-2.6-sunburst`、`gpt-image-2.6-flare` 两个网页图片入口，以及固定请求 Sunburst 的短名 `gpt-image-2.6`。使用现有网页登录账号和图片额度，支持文生图、参考图编辑、Chat/Responses 兼容入口及后台任务；准备与提交请求均保留具体 2.6 型号。
+
+尺寸和质量仍作为网页提示，结果支持静态 PNG、JPEG、WebP；型号权限以实际账号的上游响应为准。完整调用、验证和升级说明见 [Image 2.6 网页接入](./docs/image26-web-integration.zh-CN.md)。镜像：`ghcr.io/fujunchao/chatgpt2api:0.16.4`。
+
 ### v0.16.3：Free 网页图片入口与 OAuth 修复
 
 修复 v0.16.2 漏掉 `oauth_login` 来源的问题：通过内置浏览器 OAuth 登录的 Free 账号，现在不会因来源标记而被排除出模型目录和 Web 选号；无需修改已有账号的来源记录。
@@ -88,9 +94,8 @@ bun run dev
 后续更新新版本：
 
 ```bash
-docker pull ghcr.io/fujunchao/chatgpt2api:0.16.3
-docker-compose down
-docker-compose up -d
+docker compose pull app
+docker compose up -d --no-deps app
 
 ```
 
